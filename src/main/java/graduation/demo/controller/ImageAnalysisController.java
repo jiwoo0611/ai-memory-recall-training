@@ -1,7 +1,7 @@
 package graduation.demo.controller;
 
 import graduation.demo.dto.ImageAnalysisResponse;
-import graduation.demo.service.OpenAIImageAnalysisService;
+import graduation.demo.service.GeminiImageAnalysisService;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,9 +14,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/images")
 public class ImageAnalysisController {
-    private final OpenAIImageAnalysisService imageAnalysisService;
+    private final GeminiImageAnalysisService imageAnalysisService;
 
-    public ImageAnalysisController(OpenAIImageAnalysisService imageAnalysisService) {
+    public ImageAnalysisController(GeminiImageAnalysisService imageAnalysisService) {
         this.imageAnalysisService = imageAnalysisService;
     }
 
