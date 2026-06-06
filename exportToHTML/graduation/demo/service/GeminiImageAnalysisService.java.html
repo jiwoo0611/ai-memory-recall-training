@@ -1,0 +1,158 @@
+<html>
+<head>
+<title>GeminiImageAnalysisService.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #6aab73;}
+.s4 { color: #2aacb8;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+GeminiImageAnalysisService.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">graduation</span><span class="s2">.</span><span class="s1">demo</span><span class="s2">.</span><span class="s1">service</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">graduation</span><span class="s2">.</span><span class="s1">demo</span><span class="s2">.</span><span class="s1">dto</span><span class="s2">.</span><span class="s1">ImageAnalysisResponse</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">beans</span><span class="s2">.</span><span class="s1">factory</span><span class="s2">.</span><span class="s1">annotation</span><span class="s2">.</span><span class="s1">Value</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">http</span><span class="s2">.</span><span class="s1">HttpHeaders</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">http</span><span class="s2">.</span><span class="s1">MediaType</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">stereotype</span><span class="s2">.</span><span class="s1">Service</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">web</span><span class="s2">.</span><span class="s1">client</span><span class="s2">.</span><span class="s1">RestClient</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">springframework</span><span class="s2">.</span><span class="s1">web</span><span class="s2">.</span><span class="s1">multipart</span><span class="s2">.</span><span class="s1">MultipartFile</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">tools</span><span class="s2">.</span><span class="s1">jackson</span><span class="s2">.</span><span class="s1">databind</span><span class="s2">.</span><span class="s1">JsonNode</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">tools</span><span class="s2">.</span><span class="s1">jackson</span><span class="s2">.</span><span class="s1">databind</span><span class="s2">.</span><span class="s1">ObjectMapper</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Base64</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">LinkedHashMap</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">List</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Map</span><span class="s2">;</span>
+
+<span class="s1">@Service</span>
+<span class="s0">public class </span><span class="s1">GeminiImageAnalysisService </span><span class="s2">{</span>
+
+    <span class="s1">@Value</span><span class="s2">(</span><span class="s3">&quot;${gemini.api-key}&quot;</span><span class="s2">)</span>
+    <span class="s0">private </span><span class="s1">String apiKey</span><span class="s2">;</span>
+
+    <span class="s1">@Value</span><span class="s2">(</span><span class="s3">&quot;${gemini.model}&quot;</span><span class="s2">)</span>
+    <span class="s0">private </span><span class="s1">String model</span><span class="s2">;</span>
+
+    <span class="s0">private final </span><span class="s1">ObjectMapper objectMapper </span><span class="s2">= </span><span class="s0">new </span><span class="s1">ObjectMapper</span><span class="s2">();</span>
+
+    <span class="s0">public </span><span class="s1">ImageAnalysisResponse analyzeImage</span><span class="s2">(</span><span class="s1">MultipartFile image</span><span class="s2">) {</span>
+        <span class="s0">try </span><span class="s2">{</span>
+            <span class="s0">if </span><span class="s2">(</span><span class="s1">image</span><span class="s2">.</span><span class="s1">isEmpty</span><span class="s2">()) {</span>
+                <span class="s0">throw new </span><span class="s1">IllegalArgumentException</span><span class="s2">(</span><span class="s3">&quot;이미지 파일이 비어 있습니다.&quot;</span><span class="s2">);</span>
+            <span class="s2">}</span>
+
+            <span class="s1">String contentType </span><span class="s2">= </span><span class="s1">image</span><span class="s2">.</span><span class="s1">getContentType</span><span class="s2">();</span>
+
+            <span class="s0">if </span><span class="s2">(</span><span class="s1">contentType </span><span class="s2">== </span><span class="s0">null </span><span class="s2">|| !</span><span class="s1">contentType</span><span class="s2">.</span><span class="s1">startsWith</span><span class="s2">(</span><span class="s3">&quot;image/&quot;</span><span class="s2">)) {</span>
+                <span class="s0">throw new </span><span class="s1">IllegalArgumentException</span><span class="s2">(</span><span class="s3">&quot;이미지 파일만 업로드할 수 있습니다.&quot;</span><span class="s2">);</span>
+            <span class="s2">}</span>
+
+            <span class="s1">String base64Image </span><span class="s2">= </span><span class="s1">Base64</span><span class="s2">.</span><span class="s1">getEncoder</span><span class="s2">().</span><span class="s1">encodeToString</span><span class="s2">(</span><span class="s1">image</span><span class="s2">.</span><span class="s1">getBytes</span><span class="s2">());</span>
+
+            <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">requestBody </span><span class="s2">= </span><span class="s1">createGeminiRequestBody</span><span class="s2">(</span><span class="s1">base64Image</span><span class="s2">, </span><span class="s1">contentType</span><span class="s2">);</span>
+
+            <span class="s1">RestClient restClient </span><span class="s2">= </span><span class="s1">RestClient</span><span class="s2">.</span><span class="s1">builder</span><span class="s2">()</span>
+                    <span class="s2">.</span><span class="s1">baseUrl</span><span class="s2">(</span><span class="s3">&quot;https://generativelanguage.googleapis.com/v1beta&quot;</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">defaultHeader</span><span class="s2">(</span><span class="s3">&quot;x-goog-api-key&quot;</span><span class="s2">, </span><span class="s1">apiKey</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">defaultHeader</span><span class="s2">(</span><span class="s1">HttpHeaders</span><span class="s2">.</span><span class="s1">CONTENT_TYPE</span><span class="s2">, </span><span class="s1">MediaType</span><span class="s2">.</span><span class="s1">APPLICATION_JSON_VALUE</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">build</span><span class="s2">();</span>
+
+            <span class="s1">String responseBody </span><span class="s2">= </span><span class="s1">restClient</span><span class="s2">.</span><span class="s1">post</span><span class="s2">()</span>
+                    <span class="s2">.</span><span class="s1">uri</span><span class="s2">(</span><span class="s3">&quot;/models/&quot; </span><span class="s2">+ </span><span class="s1">model </span><span class="s2">+ </span><span class="s3">&quot;:generateContent&quot;</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">body</span><span class="s2">(</span><span class="s1">requestBody</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">retrieve</span><span class="s2">()</span>
+                    <span class="s2">.</span><span class="s1">body</span><span class="s2">(</span><span class="s1">String</span><span class="s2">.</span><span class="s0">class</span><span class="s2">);</span>
+
+            <span class="s1">String jsonText </span><span class="s2">= </span><span class="s1">extractTextFromGeminiResponse</span><span class="s2">(</span><span class="s1">responseBody</span><span class="s2">);</span>
+
+            <span class="s1">jsonText </span><span class="s2">= </span><span class="s1">cleanJsonText</span><span class="s2">(</span><span class="s1">jsonText</span><span class="s2">);</span>
+
+            <span class="s0">return </span><span class="s1">objectMapper</span><span class="s2">.</span><span class="s1">readValue</span><span class="s2">(</span><span class="s1">jsonText</span><span class="s2">, </span><span class="s1">ImageAnalysisResponse</span><span class="s2">.</span><span class="s0">class</span><span class="s2">);</span>
+
+        <span class="s2">} </span><span class="s0">catch </span><span class="s2">(</span><span class="s1">Exception e</span><span class="s2">) {</span>
+            <span class="s0">throw new </span><span class="s1">RuntimeException</span><span class="s2">(</span><span class="s3">&quot;Gemini 이미지 분석 중 오류가 발생했습니다: &quot; </span><span class="s2">+ </span><span class="s1">e</span><span class="s2">.</span><span class="s1">getMessage</span><span class="s2">(), </span><span class="s1">e</span><span class="s2">);</span>
+        <span class="s2">}</span>
+    <span class="s2">}</span>
+
+    <span class="s0">private </span><span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">createGeminiRequestBody</span><span class="s2">(</span><span class="s1">String base64Image</span><span class="s2">, </span><span class="s1">String contentType</span><span class="s2">) {</span>
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">requestBody </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">textPart </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+        <span class="s1">textPart</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;text&quot;</span><span class="s2">, </span><span class="s3">&quot;&quot;&quot; 
+                이 이미지를 분석해서 반드시 JSON 형식으로만 응답해줘. 
+                설명 문장, markdown, ```json 같은 코드블록 없이 순수 JSON만 반환해. 
+ 
+                JSON 구조는 반드시 아래 형식을 따라야 해. 
+ 
+                { 
+                  &quot;title&quot;: &quot;이미지의 짧은 제목&quot;, 
+                  &quot;scene&quot;: &quot;장소나 상황 설명&quot;, 
+                  &quot;mood&quot;: &quot;이미지에서 느껴지는 분위기&quot;, 
+                  &quot;description&quot;: &quot;이미지 전체 설명&quot;, 
+                  &quot;objects&quot;: [&quot;주요 사물1&quot;, &quot;주요 사물2&quot;], 
+                  &quot;tags&quot;: [&quot;태그1&quot;, &quot;태그2&quot;], 
+                  &quot;memoryQuestions&quot;: [&quot;기억 회상 질문1&quot;, &quot;기억 회상 질문2&quot;] 
+                } 
+ 
+                사용자의 기억 회상을 돕는 서비스에 사용할 것이다. 
+                이미지에서 확실히 보이는 정보 위주로만 분석해. 
+                모르는 내용은 추측하지 마. 
+                &quot;&quot;&quot;</span><span class="s2">);</span>
+
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">inlineData </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+        <span class="s1">inlineData</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;mime_type&quot;</span><span class="s2">, </span><span class="s1">contentType</span><span class="s2">);</span>
+        <span class="s1">inlineData</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;data&quot;</span><span class="s2">, </span><span class="s1">base64Image</span><span class="s2">);</span>
+
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">imagePart </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+        <span class="s1">imagePart</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;inline_data&quot;</span><span class="s2">, </span><span class="s1">inlineData</span><span class="s2">);</span>
+
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">content </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+        <span class="s1">content</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;parts&quot;</span><span class="s2">, </span><span class="s1">List</span><span class="s2">.</span><span class="s1">of</span><span class="s2">(</span><span class="s1">textPart</span><span class="s2">, </span><span class="s1">imagePart</span><span class="s2">));</span>
+
+        <span class="s1">requestBody</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;contents&quot;</span><span class="s2">, </span><span class="s1">List</span><span class="s2">.</span><span class="s1">of</span><span class="s2">(</span><span class="s1">content</span><span class="s2">));</span>
+
+        <span class="s1">Map</span><span class="s2">&lt;</span><span class="s1">String</span><span class="s2">, </span><span class="s1">Object</span><span class="s2">&gt; </span><span class="s1">generationConfig </span><span class="s2">= </span><span class="s0">new </span><span class="s1">LinkedHashMap</span><span class="s2">&lt;&gt;();</span>
+        <span class="s1">generationConfig</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;temperature&quot;</span><span class="s2">, </span><span class="s4">0.2</span><span class="s2">);</span>
+        <span class="s1">generationConfig</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;response_mime_type&quot;</span><span class="s2">, </span><span class="s3">&quot;application/json&quot;</span><span class="s2">);</span>
+
+        <span class="s1">requestBody</span><span class="s2">.</span><span class="s1">put</span><span class="s2">(</span><span class="s3">&quot;generationConfig&quot;</span><span class="s2">, </span><span class="s1">generationConfig</span><span class="s2">);</span>
+
+        <span class="s0">return </span><span class="s1">requestBody</span><span class="s2">;</span>
+    <span class="s2">}</span>
+
+    <span class="s0">private </span><span class="s1">String extractTextFromGeminiResponse</span><span class="s2">(</span><span class="s1">String responseBody</span><span class="s2">) </span><span class="s0">throws </span><span class="s1">Exception </span><span class="s2">{</span>
+        <span class="s1">JsonNode root </span><span class="s2">= </span><span class="s1">objectMapper</span><span class="s2">.</span><span class="s1">readTree</span><span class="s2">(</span><span class="s1">responseBody</span><span class="s2">);</span>
+
+        <span class="s1">JsonNode textNode </span><span class="s2">= </span><span class="s1">root</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s3">&quot;candidates&quot;</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s4">0</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s3">&quot;content&quot;</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s3">&quot;parts&quot;</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s4">0</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">path</span><span class="s2">(</span><span class="s3">&quot;text&quot;</span><span class="s2">);</span>
+
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">textNode</span><span class="s2">.</span><span class="s1">isMissingNode</span><span class="s2">() || </span><span class="s1">textNode</span><span class="s2">.</span><span class="s1">asText</span><span class="s2">().</span><span class="s1">isBlank</span><span class="s2">()) {</span>
+            <span class="s0">throw new </span><span class="s1">RuntimeException</span><span class="s2">(</span><span class="s3">&quot;Gemini 응답에서 text를 찾을 수 없습니다.&quot;</span><span class="s2">);</span>
+        <span class="s2">}</span>
+
+        <span class="s0">return </span><span class="s1">textNode</span><span class="s2">.</span><span class="s1">asText</span><span class="s2">();</span>
+    <span class="s2">}</span>
+
+    <span class="s0">private </span><span class="s1">String cleanJsonText</span><span class="s2">(</span><span class="s1">String text</span><span class="s2">) {</span>
+        <span class="s0">return </span><span class="s1">text</span>
+                <span class="s2">.</span><span class="s1">replace</span><span class="s2">(</span><span class="s3">&quot;```json&quot;</span><span class="s2">, </span><span class="s3">&quot;&quot;</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">replace</span><span class="s2">(</span><span class="s3">&quot;```&quot;</span><span class="s2">, </span><span class="s3">&quot;&quot;</span><span class="s2">)</span>
+                <span class="s2">.</span><span class="s1">trim</span><span class="s2">();</span>
+    <span class="s2">}</span>
+<span class="s2">}</span></pre>
+</body>
+</html>
