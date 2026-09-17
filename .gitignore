@@ -3,6 +3,9 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 
+### macOS ###
+.DS_Store
+
 ### STS ###
 .apt_generated
 .classpath
