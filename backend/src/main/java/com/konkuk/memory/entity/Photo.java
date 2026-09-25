@@ -29,14 +29,28 @@ public class Photo extends BaseEntity {
     private String aiClues;
 
     protected Photo() {}
-    public Photo(User user, String storageKey, String originalFilename, String contentType, long sizeBytes) {
+    public Photo(User user,
+                 Album album,
+                 String storageKey,
+                 String originalFilename,
+                 String contentType,
+                 long sizeBytes) {
         this.user = user;
+        this.album = album;
         this.storageKey = storageKey;
         this.originalFilename = originalFilename;
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
     }
     public User getUser() { return user; }
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "album_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_photos_album")
+    )
+    private Album album;
+    public Album getAlbum(){ return album; }
     public String getStorageKey() { return storageKey; }
     public String getOriginalFilename() { return originalFilename; }
     public String getContentType() { return contentType; }
@@ -46,4 +60,9 @@ public class Photo extends BaseEntity {
     public LocalDate getConfirmedTakenOn() { return confirmedTakenOn; }
     public String getConfirmedLocation() { return confirmedLocation; }
     public String getAiClues() { return aiClues; }
+    public void updateMetadate(LocalDateTime metadataTakenAt, String metadataLocation){
+        this.metadataLocation = metadataLocation;
+        this.metadataTakenAt = metadataTakenAt;
+    }
+    public void confirmMetadata(LocalDate confirmedTakenOn, String confirmedLocation){this.confirmedTakenOn = confirmedTakenOn; this.confirmedLocation = confirmedLocation;}
 }
