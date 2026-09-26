@@ -3,6 +3,8 @@ import { api, session, clearSession, expireSession } from "./api/client";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MyPage from "./pages/MyPage";
+import TrainingPage from "./pages/TrainingPage";
+import TrainingResultPage from "./pages/TrainingResultPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
 export default function App() {
@@ -94,6 +96,9 @@ export default function App() {
         }}
       />
     );
+  else if (page === "/training-demo") content = <TrainingPage />;
+  else if (page === "/training-result-demo")
+    content = <TrainingResultPage />;
   else if (page === "/mypage")
     content = auth ? (
       <MyPage key={auth.accessToken} />

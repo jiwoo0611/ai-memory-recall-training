@@ -52,12 +52,18 @@ export default function Home({ signedIn }) {
         <article>
           <span className="step">02 / 회상</span>
           <h2>이야기를 되짚고</h2>
-          <p>훈련에서 나눈 질문과 나의 답변을 다시 읽어보세요.</p>
+          <p>훈련에서 나눈 질문에 답하며 기억을 천천히 되짚어보세요.</p>
+          <a className="feature-link" href="#/training-demo">
+            훈련 화면 미리보기 →
+          </a>
         </article>
         <article>
           <span className="step">03 / 기록</span>
           <h2>기억을 이어가요</h2>
           <p>이전 훈련의 결과와 최근 기록을 모아볼 수 있어요.</p>
+          <a className="feature-link" href="#/training-result-demo">
+            결과 화면 미리보기 →
+          </a>
         </article>
       </section>
     </>

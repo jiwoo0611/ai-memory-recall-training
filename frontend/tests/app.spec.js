@@ -188,3 +188,46 @@ test("모바일 화면·홈 및 상세 404 표시", async ({ page }) => {
     fullPage: true,
   });
 });
+
+test("회상 훈련 입력 → 임시 제출 → 결과 집계", async ({ page }) => {
+  await page.goto("/#/training-demo");
+  await expect(
+    page.getByRole("heading", { name: "사진 속 이야기를 천천히 떠올려보세요." }),
+  ).toBeVisible();
+
+  await page
+    .getByLabel("나의 답변")
+    .fill("부산 해운대에서 가족과 함께 촬영했습니다.");
+  await page.getByRole("button", { name: "다음 질문" }).click();
+
+  await page.getByRole("button", { name: "기억나지 않음" }).click();
+  await page.getByRole("button", { name: "다음 질문" }).click();
+
+  await page
+    .getByLabel("나의 답변")
+    .fill("바다를 보며 함께 걸었던 순간이 기억납니다.");
+  await page.getByRole("button", { name: "답변 제출하기" }).click();
+
+  await expect(page).toHaveURL(/#\/training-result-demo$/);
+  await expect(
+    page.getByRole("heading", { name: "오늘의 기억을 기록했어요." }),
+  ).toBeVisible();
+  await expect(page.getByText("부산 해운대에서 가족과 함께 촬영했습니다.")).toBeVisible();
+  await expect(page.locator(".result-stat-grid").getByText("1", { exact: true })).toBeVisible();
+});
+
+test("회상 훈련은 빈 답변 제출을 막고 모바일에서도 넘치지 않음", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/#/training-demo");
+  await page.getByRole("button", { name: "다음 질문" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "답변을 입력하거나 다른 응답 방식을 선택해주세요.",
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
