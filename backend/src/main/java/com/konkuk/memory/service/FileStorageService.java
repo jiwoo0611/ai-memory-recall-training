@@ -45,6 +45,23 @@ public class FileStorageService {
                 .toString();
     }
 
+    public byte[] load(String storageKey) throws IOException {
+
+        Path path = rootLocation
+                .resolve(storageKey)
+                .normalize();
+
+        if (!path.startsWith(rootLocation)) {
+            throw new IOException("잘못된 파일 경로입니다.");
+        }
+
+        if (!Files.exists(path)) {
+            throw new IOException("사진 파일을 찾을 수 없습니다.");
+        }
+
+        return Files.readAllBytes(path);
+    }
+
     public void delete(String storageKey) {
 
         try {
