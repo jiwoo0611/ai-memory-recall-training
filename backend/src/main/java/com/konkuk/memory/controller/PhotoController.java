@@ -5,6 +5,7 @@ import com.konkuk.memory.dto.PhotoResponse;
 import com.konkuk.memory.entity.Photo;
 import com.konkuk.memory.exception.ApiException;
 import com.konkuk.memory.service.FileStorageService;
+import com.konkuk.memory.service.PhotoDeleteService;
 import com.konkuk.memory.service.PhotoMetadataUpdateService;
 import com.konkuk.memory.service.PhotoQueryService;
 import com.konkuk.memory.service.PhotoUploadService;
@@ -29,17 +30,20 @@ public class PhotoController {
     private final PhotoQueryService photoQueryService;
     private final PhotoMetadataUpdateService photoMetadataUpdateService;
     private final FileStorageService fileStorageService;
+    private final PhotoDeleteService photoDeleteService;
 
     public PhotoController(
             PhotoUploadService photoUploadService,
             PhotoQueryService photoQueryService,
             PhotoMetadataUpdateService photoMetadataUpdateService,
-            FileStorageService fileStorageService
+            FileStorageService fileStorageService,
+            PhotoDeleteService photoDeleteService
     ) {
         this.photoUploadService = photoUploadService;
         this.photoQueryService = photoQueryService;
         this.photoMetadataUpdateService = photoMetadataUpdateService;
         this.fileStorageService = fileStorageService;
+        this.photoDeleteService = photoDeleteService;
     }
 
     @PostMapping
@@ -89,16 +93,13 @@ public class PhotoController {
             @PathVariable Long albumId,
             @PathVariable Long photoId
     ) {
-
         Long userId = Long.valueOf(jwt.getSubject());
 
-        // 로그인한 사용자가 소유한 사진인지 확인
         Photo photo = photoQueryService.getPhotoEntity(
                 userId,
                 photoId
         );
 
-        // URL의 albumId와 실제 사진의 albumId가 같은지 확인
         if (!photo.getAlbum().getId().equals(albumId)) {
             throw new ApiException(
                     HttpStatus.NOT_FOUND,
@@ -141,6 +142,23 @@ public class PhotoController {
                     "사진 파일을 찾을 수 없습니다."
             );
         }
+    }
+
+    @DeleteMapping("/{photoId}")
+    public ResponseEntity<Void> deletePhoto(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long albumId,
+            @PathVariable Long photoId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+
+        photoDeleteService.delete(
+                userId,
+                albumId,
+                photoId
+        );
+
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{photoId}/metadata")

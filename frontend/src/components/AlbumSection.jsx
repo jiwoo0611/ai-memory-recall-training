@@ -1,11 +1,80 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { Empty, ErrorBox } from "./UI";
+import { Empty } from "./UI";
 
 function formatDate(value) {
   if (!value) return "";
-
   return new Date(value).toLocaleDateString("ko-KR");
+}
+
+function PhotoThumbnail({ albumId, photo }) {
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let objectUrl = "";
+
+    async function loadImage() {
+      try {
+        setImageError(false);
+
+        const blob = await api.photoImage(
+          albumId,
+          photo.id,
+          controller.signal,
+        );
+
+        objectUrl = URL.createObjectURL(blob);
+        setImageUrl(objectUrl);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setImageError(true);
+        }
+      }
+    }
+
+    loadImage();
+
+    return () => {
+      controller.abort();
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [albumId, photo.id]);
+
+  if (imageError) {
+    return (
+      <div className="file-mark" aria-hidden="true">
+        ▧
+      </div>
+    );
+  }
+
+  if (!imageUrl) {
+    return (
+      <div className="file-mark" aria-hidden="true">
+        불러오는 중...
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={photo.originalFilename}
+      style={{
+        width: "100%",
+        height: "180px",
+        objectFit: "cover",
+        borderRadius: "12px",
+        display: "block",
+        marginBottom: "12px",
+      }}
+    />
+  );
 }
 
 export default function AlbumSection() {
@@ -22,6 +91,8 @@ export default function AlbumSection() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
+  const [deletingPhotoId, setDeletingPhotoId] = useState(null);
+
   const fileInputRef = useRef(null);
 
   const loadAlbums = async () => {
@@ -30,7 +101,6 @@ export default function AlbumSection() {
       setError("");
 
       const data = await api.albums();
-
       setAlbums(data);
     } catch (err) {
       setError(
@@ -89,7 +159,6 @@ export default function AlbumSection() {
       setError("");
 
       const photos = await api.albumPhotos(album.id);
-
       setAlbumPhotos(photos);
     } catch (err) {
       setError(
@@ -130,9 +199,38 @@ export default function AlbumSection() {
     }
   };
 
-  /*
-   * 앨범 내부 화면
-   */
+  const handleDeletePhoto = async (photo) => {
+    if (!selectedAlbum) return;
+
+    const confirmed = window.confirm(
+      `"${photo.originalFilename}" 사진을 삭제할까요?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingPhotoId(photo.id);
+      setUploadError("");
+
+      await api.deletePhoto(
+        selectedAlbum.id,
+        photo.id,
+      );
+
+      setAlbumPhotos((previous) =>
+        previous.filter(
+          (item) => item.id !== photo.id,
+        ),
+      );
+    } catch (err) {
+      setUploadError(
+        err.message || "사진 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
   if (selectedAlbum) {
     return (
       <section className="card">
@@ -158,7 +256,7 @@ export default function AlbumSection() {
               type="file"
               accept="image/*"
               multiple
-              hidden
+              style={{ display: "none" }}
               onChange={handleUpload}
             />
 
@@ -193,16 +291,12 @@ export default function AlbumSection() {
                 className="photo-item"
                 key={photo.id}
               >
-                <div
-                  className="file-mark"
-                  aria-hidden="true"
-                >
-                  ▧
-                </div>
+                <PhotoThumbnail
+                  albumId={selectedAlbum.id}
+                  photo={photo}
+                />
 
-                <h3>
-                  {photo.originalFilename}
-                </h3>
+                <h3>{photo.originalFilename}</h3>
 
                 <p className="muted">
                   {photo.contentType} ·{" "}
@@ -212,7 +306,6 @@ export default function AlbumSection() {
                 <dl>
                   <div>
                     <dt>촬영일</dt>
-
                     <dd>
                       {photo.confirmedTakenOn ||
                         photo.metadataTakenAt ||
@@ -222,7 +315,6 @@ export default function AlbumSection() {
 
                   <div>
                     <dt>장소</dt>
-
                     <dd>
                       {photo.confirmedLocation ||
                         photo.metadataLocation ||
@@ -230,6 +322,21 @@ export default function AlbumSection() {
                     </dd>
                   </div>
                 </dl>
+
+                <button
+                  type="button"
+                  disabled={deletingPhotoId === photo.id}
+                  onClick={() =>
+                    handleDeletePhoto(photo)
+                  }
+                  style={{
+                    marginTop: "16px",
+                  }}
+                >
+                  {deletingPhotoId === photo.id
+                    ? "삭제 중..."
+                    : "삭제"}
+                </button>
               </article>
             ))}
           </div>
@@ -238,9 +345,6 @@ export default function AlbumSection() {
     );
   }
 
-  /*
-   * 앨범 목록 화면
-   */
   return (
     <section className="card">
       <div className="section-heading">

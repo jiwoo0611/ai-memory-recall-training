@@ -340,6 +340,15 @@ export const api = {
   uploadPhotos,
   photoImage,
 
+  // 사진 삭제
+  deletePhoto: (albumId, photoId) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}`,
+      {
+        method: "DELETE",
+      },
+    ),
+
   // 전체 사용자 사진
   photos: (page = 0, signal) =>
     request(`/api/users/me/photos?page=${page}&size=6`, {
