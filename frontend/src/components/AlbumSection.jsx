@@ -92,6 +92,7 @@ export default function AlbumSection() {
   const [uploadError, setUploadError] = useState("");
 
   const [deletingPhotoId, setDeletingPhotoId] = useState(null);
+  const [deletingAlbumId, setDeletingAlbumId] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -228,6 +229,35 @@ export default function AlbumSection() {
       );
     } finally {
       setDeletingPhotoId(null);
+    }
+  };
+
+  const handleDeleteAlbum = async (event, album) => {
+    event.stopPropagation();
+
+    const confirmed = window.confirm(
+      `"${album.title}" 앨범을 삭제할까요?\n앨범 안의 사진도 모두 삭제됩니다.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingAlbumId(album.id);
+      setError("");
+
+      await api.deleteAlbum(album.id);
+
+      setAlbums((previous) =>
+        previous.filter(
+          (item) => item.id !== album.id,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err.message || "앨범 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingAlbumId(null);
     }
   };
 
@@ -407,8 +437,7 @@ export default function AlbumSection() {
       ) : (
         <div className="photo-grid">
           {albums.map((album) => (
-            <button
-              type="button"
+            <article
               className="photo-item"
               key={album.id}
               onClick={() =>
@@ -431,7 +460,22 @@ export default function AlbumSection() {
               <p className="muted">
                 생성일 {formatDate(album.createdAt)}
               </p>
-            </button>
+
+              <button
+                type="button"
+                disabled={deletingAlbumId === album.id}
+                onClick={(event) =>
+                  handleDeleteAlbum(event, album)
+                }
+                style={{
+                  marginTop: "16px",
+                }}
+              >
+                {deletingAlbumId === album.id
+                  ? "삭제 중..."
+                  : "앨범 삭제"}
+              </button>
+            </article>
           ))}
         </div>
       )}

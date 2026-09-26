@@ -103,6 +103,7 @@ export async function request(
 
   if (authenticated && (!token || current.expiresAt <= Date.now())) {
     expireSession();
+
     throw new ApiError(401, {
       message: "다시 로그인해주세요.",
     });
@@ -325,16 +326,29 @@ export const api = {
       body: { title },
     }),
 
+  deleteAlbum: (albumId) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}`,
+      {
+        method: "DELETE",
+      },
+    ),
+
   album: (albumId, signal) =>
-    request(`/api/albums/${encodeURIComponent(albumId)}`, {
-      signal,
-    }),
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}`,
+      {
+        signal,
+      },
+    ),
 
   // 특정 앨범의 사진 목록
   albumPhotos: (albumId, signal) =>
     request(
       `/api/albums/${encodeURIComponent(albumId)}/photos`,
-      { signal },
+      {
+        signal,
+      },
     ),
 
   uploadPhotos,
@@ -351,19 +365,26 @@ export const api = {
 
   // 전체 사용자 사진
   photos: (page = 0, signal) =>
-    request(`/api/users/me/photos?page=${page}&size=6`, {
-      signal,
-    }),
+    request(
+      `/api/users/me/photos?page=${page}&size=6`,
+      {
+        signal,
+      },
+    ),
 
   sessions: (page = 0, signal) =>
     request(
       `/api/users/me/training-sessions?page=${page}&size=6`,
-      { signal },
+      {
+        signal,
+      },
     ),
 
   detail: (id, signal) =>
     request(
       `/api/users/me/training-sessions/${encodeURIComponent(id)}`,
-      { signal },
+      {
+        signal,
+      },
     ),
 };
