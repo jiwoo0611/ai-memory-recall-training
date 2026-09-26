@@ -213,7 +213,7 @@ test("회상 훈련 입력 → 임시 제출 → 결과 집계", async ({ page }
     page.getByRole("heading", { name: "오늘의 기억을 기록했어요." }),
   ).toBeVisible();
   await expect(page.getByText("부산 해운대에서 가족과 함께 촬영했습니다.")).toBeVisible();
-  await expect(page.getByText("기억나지 않음", { exact: true })).toBeVisible();
+  await expect(page.locator(".result-stat-grid").getByText("1", { exact: true })).toBeVisible();
 });
 
 test("회상 훈련은 빈 답변 제출을 막고 모바일에서도 넘치지 않음", async ({
