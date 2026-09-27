@@ -236,18 +236,18 @@ public class GeminiQuestionGenerationClient {
     private static String buildQuestion(Question.Type type, String focus) {
         String quotedFocus = "“" + focus + "”";
         return switch (type) {
-            case EXPERIENCE -> "사진에서 확인된 " + quotedFocus
-                    + "와 관련해 떠오르는 개인적인 기억이 있다면 이야기해 주세요.";
-            case PHOTO_CLUE -> "사진에서 확인된 " + quotedFocus
+            case EXPERIENCE -> "사진에서 확인된 단서 가운데 " + quotedFocus
+                    + "에 관한 개인적인 기억이 있다면 이야기해 주세요.";
+            case PHOTO_CLUE -> "사진에서 확인된 단서 가운데 " + quotedFocus
                     + "에서 어떤 기억이 떠오르나요?";
-            case CONTEXT -> "사진에서 확인된 " + quotedFocus
-                    + "는 어떤 기억이나 상황과 연결되나요?";
-            case INFORMATION_CHECK -> "사진 정보에 기록된 " + quotedFocus
-                    + "가 맞는지 확인해 주세요.";
+            case CONTEXT -> "사진에서 확인된 단서 " + quotedFocus
+                    + "에 연결되는 기억이나 상황이 있나요?";
+            case INFORMATION_CHECK -> "사진 정보의 " + quotedFocus
+                    + " 항목이 맞는지 확인해 주세요.";
         };
     }
     public String generationVersion() {
-        return model + ":album-v3";
+        return model + ":album-v4";
     }
 
     private static String extractOutput(JsonNode response) {

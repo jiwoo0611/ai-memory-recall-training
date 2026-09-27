@@ -55,14 +55,14 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L, 12L);
         assertThat(questions.get(0).verifiable()).isFalse();
         assertThat(questions.get(0).content())
-                .isEqualTo("사진에서 확인된 “피자와 캠핑 일러스트”와 관련해 떠오르는 개인적인 기억이 있다면 이야기해 주세요.");
+                .isEqualTo("사진에서 확인된 단서 가운데 “피자와 캠핑 일러스트”에 관한 개인적인 기억이 있다면 이야기해 주세요.");
         assertThat(questions.get(0).content()).doesNotContain("찍던 날");
         assertThat(questions.get(2).type()).isEqualTo(Question.Type.INFORMATION_CHECK);
         assertThat(questions.get(2).verifiable()).isTrue();
         assertThat(questions.get(2).referenceInformation())
                 .isEqualTo("EXIF 촬영일: 2026-05-09");
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-v3");
+                .isEqualTo("gemini-3.5-flash-lite:album-v4");
     }
 
     @Test
