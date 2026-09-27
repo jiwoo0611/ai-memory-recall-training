@@ -31,4 +31,7 @@ public class TrainingSession extends BaseEntity {
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public long getVersion() { return version; }
+    public void markGeneratingQuestions() { this.status = Status.GENERATING_QUESTIONS; }
+    public void markInProgress() { this.status = Status.IN_PROGRESS; }
+    public void markQuestionGenerationFailed() { this.status = Status.QUESTION_GENERATION_FAILED; }
 }
