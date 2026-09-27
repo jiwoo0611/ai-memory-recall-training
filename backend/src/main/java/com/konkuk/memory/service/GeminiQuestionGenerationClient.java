@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -25,6 +27,8 @@ import java.util.Set;
 
 @Service
 public class GeminiQuestionGenerationClient {
+
+    private static final Logger log = LoggerFactory.getLogger(GeminiQuestionGenerationClient.class);
 
     private static final int MIN_AI_QUESTIONS = 8;
     private static final int MAX_AI_QUESTIONS = 11;
@@ -135,7 +139,7 @@ public class GeminiQuestionGenerationClient {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(60));
+        requestFactory.setReadTimeout(Duration.ofSeconds(150));
         this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com")
                 .requestFactory(requestFactory)
@@ -163,13 +167,8 @@ public class GeminiQuestionGenerationClient {
         );
 
         try {
-            JsonNode response = restClient.post()
-                    .uri("/v1beta/models/{model}:generateContent", model)
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = requestWithRetry(request);
+
             String output = extractOutput(response);
             if (output == null || output.isBlank()) {
                 throw invalidResponse();
@@ -177,17 +176,46 @@ public class GeminiQuestionGenerationClient {
             return normalize(output, allowedPhotoIds);
         } catch (ApiException ex) {
             throw ex;
-        } catch (RestClientResponseException ex) {
-            throw upstreamFailure(ex.getStatusCode().value(), extractUpstreamMessage(ex.getResponseBodyAsString()));
         } catch (JsonProcessingException ex) {
             throw invalidResponse();
-        } catch (RestClientException ex) {
-            throw new ApiException(
-                    HttpStatus.BAD_GATEWAY,
-                    "AI_CONNECTION_FAILED",
-                    "Gemini 서버에 연결하지 못했습니다."
-            );
         }
+    }
+
+    private JsonNode requestWithRetry(Map<String, Object> request) {
+        RestClientException lastFailure = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                return restClient.post()
+                        .uri("/v1beta/models/{model}:generateContent", model)
+                        .header("x-goog-api-key", apiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(request)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (RestClientResponseException ex) {
+                throw upstreamFailure(ex.getStatusCode().value(), extractUpstreamMessage(ex.getResponseBodyAsString()));
+            } catch (RestClientException ex) {
+                lastFailure = ex;
+                log.warn("Gemini question generation connection failed (attempt {}): {}", attempt, ex.toString());
+                if (isTimeout(ex)) {
+                    throw timeoutFailure();
+                }
+            }
+        }
+        log.warn("Gemini question generation failed after retry: {}", String.valueOf(lastFailure));
+        throw connectionFailure();
+    }
+
+    private static boolean isTimeout(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof java.net.http.HttpTimeoutException
+                    || current instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     List<GeneratedQuestion> normalize(String output, Set<Long> allowedPhotoIds) throws JsonProcessingException {
@@ -356,6 +384,21 @@ public class GeminiQuestionGenerationClient {
         };
     }
 
+    private static ApiException timeoutFailure() {
+        return new ApiException(
+                HttpStatus.GATEWAY_TIMEOUT,
+                "AI_QUESTION_TIMEOUT",
+                "질문 생성 응답이 지연되었습니다. 잠시 후 다시 시도해주세요."
+        );
+    }
+
+    private static ApiException connectionFailure() {
+        return new ApiException(
+                HttpStatus.BAD_GATEWAY,
+                "AI_CONNECTION_FAILED",
+                "질문 생성 중 Gemini 연결이 끊어졌습니다. 잠시 후 다시 시도해주세요."
+        );
+    }
     private static ApiException invalidResponse() {
         return new ApiException(
                 HttpStatus.BAD_GATEWAY,
