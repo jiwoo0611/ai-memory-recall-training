@@ -2,6 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import PhotoImage from "../components/PhotoImage";
 
+const DIFFICULTY_LABELS = {
+  EASY: "쉬움",
+  MEDIUM: "보통",
+  HARD: "어려움",
+};
+
+function difficultyLabel(value) {
+  return DIFFICULTY_LABELS[value] || "보통";
+}
+
 export default function QuizPage({ albumId, sessionId }) {
   const [album, setAlbum] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -10,7 +20,9 @@ export default function QuizPage({ albumId, sessionId }) {
   const [error, setError] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [completed, setCompleted] = useState(false);
+  const [scoreResult, setScoreResult] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -97,14 +109,51 @@ export default function QuizPage({ albumId, sessionId }) {
 
   const answeredCount = Object.keys(answers).length;
 
-  if (completed) {
+  if (scoreResult) {
+    const wrongAnswers = scoreResult.results.filter((item) => !item.correct);
+    const percentage = Math.round(
+      (scoreResult.correctCount / scoreResult.totalCount) * 100,
+    );
+
     return (
-      <section className="card quiz-page quiz-complete">
-        <p className="eyebrow">ALBUM RECALL COMPLETE</p>
-        <h1>회상 퀴즈를 완료했습니다</h1>
-        <p>
-          {album?.title || "앨범"}의 기억 {questions.length}개를 모두 떠올려봤습니다.
-        </p>
+      <section className="card quiz-page quiz-result-page">
+        <p className="eyebrow">ALBUM RECALL RESULT</p>
+        <h1>회상 퀴즈 결과</h1>
+        <div className="quiz-score-summary">
+          <strong>{scoreResult.correctCount} / {scoreResult.totalCount}</strong>
+          <span>{percentage}점</span>
+          <p>{scoreResult.incorrectCount}개 문제를 다시 확인해보세요.</p>
+        </div>
+
+        {wrongAnswers.length ? (
+          <section className="wrong-answer-section">
+            <h2>틀린 문제</h2>
+            <div className="wrong-answer-list">
+              {wrongAnswers.map((item, index) => (
+                <article className="wrong-answer-card" key={item.questionId}>
+                  <div className="wrong-answer-heading">
+                    <span>오답 {index + 1}</span>
+                    <span className={`difficulty-badge difficulty-${item.difficulty?.toLowerCase() || "medium"}`}>
+                      {difficultyLabel(item.difficulty)}
+                    </span>
+                  </div>
+                  <h3>{item.content}</h3>
+                  <p className="selected-wrong-answer">
+                    <span>내가 고른 답</span>
+                    {item.selectedOption}
+                  </p>
+                  <p className="correct-answer">
+                    <span>정답</span>
+                    {item.correctOption}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <p className="all-correct-message">모든 문제를 맞혔습니다.</p>
+        )}
+
         <div className="quiz-complete-actions">
           <button
             className="button"
@@ -112,7 +161,8 @@ export default function QuizPage({ albumId, sessionId }) {
             onClick={() => {
               setAnswers({});
               setCurrentIndex(0);
-              setCompleted(false);
+              setScoreResult(null);
+              setSubmissionError("");
               window.scrollTo(0, 0);
             }}
           >
@@ -134,18 +184,33 @@ export default function QuizPage({ albumId, sessionId }) {
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   function selectOption(index) {
+    setSubmissionError("");
     setAnswers((current) => ({ ...current, [question.id]: index }));
   }
 
-  function moveNext() {
-    if (selectedOption === undefined) return;
-    if (currentIndex === questions.length - 1) {
-      setCompleted(true);
+  async function moveNext() {
+    if (selectedOption === undefined || submitting) return;
+    if (currentIndex !== questions.length - 1) {
+      setCurrentIndex((current) => current + 1);
       window.scrollTo(0, 0);
       return;
     }
-    setCurrentIndex((current) => current + 1);
-    window.scrollTo(0, 0);
+
+    try {
+      setSubmitting(true);
+      setSubmissionError("");
+      const submittedAnswers = questions.map((item) => ({
+        questionId: item.id,
+        selectedOptionIndex: answers[item.id],
+      }));
+      const result = await api.submitQuiz(sessionId, submittedAnswers);
+      setScoreResult(result);
+      window.scrollTo(0, 0);
+    } catch (err) {
+      setSubmissionError(err.message || "퀴즈를 채점하지 못했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -192,7 +257,12 @@ export default function QuizPage({ albumId, sessionId }) {
         )}
 
         <div className="quiz-question-area">
-          <p className="quiz-question-number">질문 {currentIndex + 1}</p>
+          <div className="quiz-question-meta">
+            <p className="quiz-question-number">질문 {currentIndex + 1}</p>
+            <span className={`difficulty-badge difficulty-${question.difficulty?.toLowerCase() || "medium"}`}>
+              {difficultyLabel(question.difficulty)}
+            </span>
+          </div>
           <h2>{question.content}</h2>
           <div className="quiz-choice-grid" role="radiogroup" aria-label="답 선택">
             {question.options.map((option, index) => {
@@ -215,10 +285,14 @@ export default function QuizPage({ albumId, sessionId }) {
         </div>
       </article>
 
+      {submissionError ? (
+        <p className="error" role="alert">{submissionError}</p>
+      ) : null}
+
       <div className="quiz-navigation">
         <button
           type="button"
-          disabled={currentIndex === 0}
+          disabled={currentIndex === 0 || submitting}
           onClick={() => {
             setCurrentIndex((current) => current - 1);
             window.scrollTo(0, 0);
@@ -230,10 +304,14 @@ export default function QuizPage({ albumId, sessionId }) {
         <button
           className="button"
           type="button"
-          disabled={selectedOption === undefined}
+          disabled={selectedOption === undefined || submitting}
           onClick={moveNext}
         >
-          {currentIndex === questions.length - 1 ? "퀴즈 완료" : "다음"}
+          {submitting
+            ? "채점 중…"
+            : currentIndex === questions.length - 1
+              ? "제출하고 결과 보기"
+              : "다음"}
         </button>
       </div>
     </section>

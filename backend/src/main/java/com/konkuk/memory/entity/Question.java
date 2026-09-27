@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 public class Question extends BaseEntity {
     public enum Type { PHOTO_CLUE, EXPERIENCE, CONTEXT, INFORMATION_CHECK }
     public enum Format { MULTIPLE_CHOICE, FREE_TEXT }
+    public enum Difficulty { EASY, MEDIUM, HARD }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "training_session_id", nullable = false, foreignKey = @ForeignKey(name = "fk_questions_session"))

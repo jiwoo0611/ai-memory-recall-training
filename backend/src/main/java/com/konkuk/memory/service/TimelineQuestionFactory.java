@@ -83,6 +83,7 @@ public class TimelineQuestionFactory {
             return Optional.of(new GeminiQuestionGenerationClient.GeneratedQuestion(
                     "이 앨범의 기억을 촬영한 시간 순서대로 나열한 것은 무엇인가요?",
                     Question.Type.INFORMATION_CHECK,
+                    Question.Difficulty.HARD,
                     List.copyOf(orderedOptions),
                     correctIndex,
                     selected.stream().map(TimedClue::photoId).toList(),

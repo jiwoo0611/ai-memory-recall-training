@@ -11,7 +11,7 @@ public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryRespo
                                             TrainingSession.Status status, Instant startedAt, Instant completedAt,
                                             List<QuestionInfo> questions, ResultInfo result) {
     public record QuestionInfo(Long id, int questionOrder, String content, Question.Type type,
-                               Question.Format format, List<String> options, List<Long> displayPhotoIds, AnswerInfo answer) {
+                               Question.Format format, Question.Difficulty difficulty, List<String> options, List<Long> displayPhotoIds, AnswerInfo answer) {
         public static QuestionInfo from(Question question, Answer answer, ObjectMapper objectMapper) {
             return new QuestionInfo(
                     question.getId(),
@@ -19,12 +19,21 @@ public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryRespo
                     question.getContent(),
                     question.getType(),
                     question.getFormat(),
+                    readDifficulty(question.getEvidenceSnapshot(), objectMapper),
                     readOptions(question.getOptionsJson(), objectMapper),
                     readDisplayPhotoIds(question.getEvidenceSnapshot(), objectMapper),
                     answer == null ? null : AnswerInfo.from(answer)
             );
         }
 
+        private static Question.Difficulty readDifficulty(String evidenceSnapshot, ObjectMapper objectMapper) {
+            try {
+                String value = objectMapper.readTree(evidenceSnapshot).path("difficulty").asText("MEDIUM");
+                return Question.Difficulty.valueOf(value);
+            } catch (Exception ignored) {
+                return Question.Difficulty.MEDIUM;
+            }
+        }
         private static List<Long> readDisplayPhotoIds(String evidenceSnapshot, ObjectMapper objectMapper) {
             if (evidenceSnapshot == null || evidenceSnapshot.isBlank()) {
                 return List.of();

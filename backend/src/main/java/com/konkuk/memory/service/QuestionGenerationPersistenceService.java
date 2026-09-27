@@ -66,7 +66,7 @@ public class QuestionGenerationPersistenceService {
                     order++,
                     item.content(),
                     item.type(),
-                    evidenceSnapshot(albumEvidenceJson, item.evidencePhotoIds(), item.displayPhotoIds()),
+                    evidenceSnapshot(albumEvidenceJson, item.evidencePhotoIds(), item.displayPhotoIds(), item.difficulty()),
                     item.verifiable(),
                     item.referenceInformation(),
                     generationVersion,
@@ -93,13 +93,14 @@ public class QuestionGenerationPersistenceService {
                 ));
     }
 
-    private String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds, List<Long> displayPhotoIds) {
+    private String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds, List<Long> displayPhotoIds, Question.Difficulty difficulty) {
         try {
             ObjectNode snapshot = objectMapper.createObjectNode();
             snapshot.put("scope", "ALBUM");
             snapshot.set("albumEvidence", objectMapper.readTree(albumEvidenceJson));
             snapshot.set("evidencePhotoIds", objectMapper.valueToTree(evidencePhotoIds));
             snapshot.set("displayPhotoIds", objectMapper.valueToTree(displayPhotoIds));
+            snapshot.put("difficulty", difficulty.name());
             return objectMapper.writeValueAsString(snapshot);
         } catch (JsonProcessingException ex) {
             throw storageFailure();

@@ -39,6 +39,7 @@ class TimelineQuestionFactoryTest {
 
         assertThat(question.content()).contains("시간 순서");
         assertThat(question.options()).hasSize(4).doesNotHaveDuplicates();
+        assertThat(question.difficulty()).isEqualTo(com.konkuk.memory.entity.Question.Difficulty.HARD);
         assertThat(question.options().get(question.correctOptionIndex()))
                 .isEqualTo("캠핑 준비 → 피자 → Dewar's");
         assertThat(question.evidencePhotoIds()).containsExactly(11L, 12L, 13L);

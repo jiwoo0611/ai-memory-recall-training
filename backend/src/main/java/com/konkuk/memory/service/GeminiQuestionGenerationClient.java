@@ -35,7 +35,8 @@ public class GeminiQuestionGenerationClient {
     private static final String PROMPT = """
             아래 JSON은 한 앨범의 사진들에서 얻은 통합 근거입니다.
             앨범 전체를 바탕으로 기억을 떠올리게 하는 한국어 객관식 질문을 8~11개 만드세요.
-            질문마다 사진을 숨길지, 관련 사진을 보여줄지 판단해 displayPhotoIds에 반영하세요.
+            질문마다 난이도와 사진 표시 여부를 결정하세요.
+            난이도 분포는 EASY 3개, MEDIUM 3~5개, HARD 2~3개로 구성하세요.
 
             사진을 숨기는 질문 예:
             - 이때 먹었던 음식은 무엇인가요?
@@ -52,6 +53,9 @@ public class GeminiQuestionGenerationClient {
             - 정답은 AI 단서, EXIF 촬영 시각 또는 EXIF 위치에서 직접 확인되어야 합니다.
             - 음식·음료·상표·사물 자체가 정답인 직접 회상 문제는 displayPhotoIds를 빈 배열로 두세요.
             - 시간 순서, 장면 전후 관계, 같은 날의 연결을 묻는 문제는 displayPhotoIds에 보여줄 evidencePhotoIds 일부를 넣으세요.
+            - EASY는 한 사진의 명확한 음식·음료·상표·활동을 직접 회상하며 사진은 숨기세요.
+            - MEDIUM은 같은 날의 단서나 장면과 활동의 관계를 연결하세요.
+            - HARD는 반드시 서로 다른 사진 2장 이상의 시간 순서나 사건 관계를 결합하세요.
             - 사진을 보여주는 문제는 2~4개, 나머지는 사진을 숨기는 문제로 구성하세요.
             - 사진을 보여주는 문제도 단순히 '사진에 무엇이 보이나요'라고 묻지 말고 사건의 관계와 기억을 물으세요.
             - 사람 수, 신원, 성별, 관계, 감정에 관한 질문과 선택지는 만들지 마세요.
@@ -65,6 +69,8 @@ public class GeminiQuestionGenerationClient {
             - displayPhotoIds는 evidencePhotoIds의 부분집합이며 최대 4개입니다.
             - referenceInformation에는 정답을 뒷받침하는 근거를 짧게 적으세요.
             - 질문끼리 표현이나 정답이 반복되면 안 됩니다.
+            - '어떤 기억이 떠오르나요', '개인적인 기억', '상황과 연결되나요' 같은 주관식·모호한 표현은 금지합니다.
+            - 질문만 읽어도 무엇을 회상해야 하는지 명확해야 하며, 정답을 질문 속에 노출하지 마세요.
 
             앨범 사진 통합 근거 JSON:
             """;
@@ -83,6 +89,10 @@ public class GeminiQuestionGenerationClient {
                                             "type", Map.of(
                                                     "type", "string",
                                                     "enum", List.of("PHOTO_CLUE", "CONTEXT", "INFORMATION_CHECK")
+                                            ),
+                                            "difficulty", Map.of(
+                                                    "type", "string",
+                                                    "enum", List.of("EASY", "MEDIUM", "HARD")
                                             ),
                                             "options", Map.of(
                                                     "type", "array",
@@ -109,6 +119,7 @@ public class GeminiQuestionGenerationClient {
                                     "required", List.of(
                                             "content",
                                             "type",
+                                            "difficulty",
                                             "options",
                                             "correctOptionIndex",
                                             "evidencePhotoIds",
@@ -239,6 +250,12 @@ public class GeminiQuestionGenerationClient {
             if (type == Question.Type.EXPERIENCE) {
                 throw invalidResponse();
             }
+            Question.Difficulty difficulty;
+            try {
+                difficulty = Question.Difficulty.valueOf(item.path("difficulty").asText(""));
+            } catch (IllegalArgumentException ex) {
+                throw invalidResponse();
+            }
 
             List<String> options = new ArrayList<>();
             Set<String> uniqueOptions = new LinkedHashSet<>();
@@ -284,6 +301,7 @@ public class GeminiQuestionGenerationClient {
             if (content.isBlank()
                     || !content.endsWith("?")
                     || containsPeopleTopic(content)
+                    || containsVaguePrompt(content)
                     || !uniqueQuestions.add(content)
                     || options.size() != 4
                     || options.stream().anyMatch(GeminiQuestionGenerationClient::containsPeopleTopic)
@@ -294,6 +312,8 @@ public class GeminiQuestionGenerationClient {
                     || !displayIds.isArray()
                     || displayPhotoIds.size() != displayIds.size()
                     || displayPhotoIds.size() > 4
+                    || (difficulty == Question.Difficulty.EASY && !displayPhotoIds.isEmpty())
+                    || (difficulty == Question.Difficulty.HARD && evidencePhotoIds.size() < 2)
                     || reference.isBlank()) {
                 throw invalidResponse();
             }
@@ -301,6 +321,7 @@ public class GeminiQuestionGenerationClient {
             result.add(new GeneratedQuestion(
                     content,
                     type,
+                    difficulty,
                     List.copyOf(options),
                     correctOptionIndex,
                     List.copyOf(evidencePhotoIds),
@@ -310,16 +331,24 @@ public class GeminiQuestionGenerationClient {
             ));
         }
         long shownCount = result.stream().filter(question -> !question.displayPhotoIds().isEmpty()).count();
-        if (shownCount < 2 || result.size() - shownCount < 4) {
+        long easyCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.EASY).count();
+        long mediumCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.MEDIUM).count();
+        long hardCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.HARD).count();
+        if (shownCount < 2 || result.size() - shownCount < 4
+                || easyCount < 3 || mediumCount < 3 || hardCount < 2) {
             throw invalidResponse();
         }
         return List.copyOf(result);
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v2";
+        return model + ":album-recall-mcq-v3";
     }
 
+    private static boolean containsVaguePrompt(String value) {
+        return List.of("어떤 기억", "무엇이 떠오르", "개인적인 기억", "상황과 연결", "이야기해 주세요")
+                .stream().anyMatch(value::contains);
+    }
     private static boolean containsPeopleTopic(String value) {
         String lowered = value.toLowerCase();
         return List.of("사람 수", "몇 명", "인물", "남성", "여성", "아이", "어린이", "친구", "가족",
@@ -410,6 +439,7 @@ public class GeminiQuestionGenerationClient {
     public record GeneratedQuestion(
             String content,
             Question.Type type,
+            Question.Difficulty difficulty,
             List<String> options,
             int correctOptionIndex,
             List<Long> evidencePhotoIds,
