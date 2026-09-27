@@ -25,21 +25,21 @@ class GeminiQuestionGenerationClientTest {
                 {
                   "questions": [
                     {
-                      "content": "이 사진들을 찍던 날 가장 기억에 남는 순간은 무엇인가요?",
+                      "focus": "피자와 캠핑 일러스트",
                       "type": "EXPERIENCE",
                       "evidencePhotoIds": [11, 12, 999],
                       "verifiable": false,
                       "referenceInformation": ""
                     },
                     {
-                      "content": "사진마다 보이는 음식은 당시 어떤 자리와 관련이 있나요?",
+                      "focus": "사진마다 보이는 음식",
                       "type": "PHOTO_CLUE",
                       "evidencePhotoIds": [11, 12],
                       "verifiable": false,
                       "referenceInformation": ""
                     },
                     {
-                      "content": "촬영 날짜가 2026년 5월 9일이 맞나요?",
+                      "focus": "2026년 5월 9일 촬영 날짜",
                       "type": "INFORMATION_CHECK",
                       "evidencePhotoIds": [12],
                       "verifiable": true,
@@ -54,12 +54,15 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions).hasSize(3);
         assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L, 12L);
         assertThat(questions.get(0).verifiable()).isFalse();
+        assertThat(questions.get(0).content())
+                .isEqualTo("사진에서 확인된 “피자와 캠핑 일러스트”와 관련해 떠오르는 개인적인 기억이 있다면 이야기해 주세요.");
+        assertThat(questions.get(0).content()).doesNotContain("찍던 날");
         assertThat(questions.get(2).type()).isEqualTo(Question.Type.INFORMATION_CHECK);
         assertThat(questions.get(2).verifiable()).isTrue();
         assertThat(questions.get(2).referenceInformation())
                 .isEqualTo("EXIF 촬영일: 2026-05-09");
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-v2");
+                .isEqualTo("gemini-3.5-flash-lite:album-v3");
     }
 
     @Test
@@ -67,9 +70,9 @@ class GeminiQuestionGenerationClientTest {
         String output = """
                 {
                   "questions": [
-                    {"content":"질문 1", "type":"EXPERIENCE", "evidencePhotoIds":[999], "verifiable":false, "referenceInformation":""},
-                    {"content":"질문 2", "type":"PHOTO_CLUE", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""},
-                    {"content":"질문 3", "type":"CONTEXT", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""}
+                    {"focus":"첫 번째 단서", "type":"EXPERIENCE", "evidencePhotoIds":[999], "verifiable":false, "referenceInformation":""},
+                    {"focus":"두 번째 단서", "type":"PHOTO_CLUE", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""},
+                    {"focus":"세 번째 단서", "type":"CONTEXT", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""}
                   ]
                 }
                 """;
