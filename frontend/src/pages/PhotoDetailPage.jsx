@@ -17,6 +17,12 @@ const sessionStatusLabels = {
   QUESTION_GENERATION_FAILED: "질문 생성 실패",
 };
 
+const confidenceLabels = {
+  HIGH: "높은 확률",
+  MEDIUM: "중간 확률",
+  LOW: "낮은 확률",
+};
+
 function formatTakenAt(value) {
   if (!value) return "";
 
@@ -47,35 +53,62 @@ function extractClues(value) {
   }
 
   const clues = [];
-
-  function collect(item) {
-    if (typeof item === "string") {
-      if (item.trim()) clues.push(item.trim());
-      return;
+  const add = (item, prefix = "") => {
+    if (typeof item !== "string" || !item.trim()) return;
+    clues.push(`${prefix}${item.trim()}`);
+  };
+  const addAll = (items, prefix = "") => {
+    if (Array.isArray(items)) {
+      items.forEach((item) => add(item, prefix));
     }
+  };
 
-    if (Array.isArray(item)) {
-      item.forEach(collect);
-      return;
-    }
+  add(parsed.summary);
+  add(parsed.scene, "장면: ");
 
-    if (!item || typeof item !== "object") return;
-
-    const preferred =
-      item.clue ??
-      item.text ??
-      item.label ??
-      item.description ??
-      item.value;
-
-    if (typeof preferred === "string") {
-      collect(preferred);
-    } else if (Array.isArray(preferred)) {
-      preferred.forEach(collect);
-    }
+  if (Array.isArray(parsed.foods)) {
+    parsed.foods.forEach((food) => {
+      if (!food?.name) return;
+      const confidence =
+        confidenceLabels[food.confidence] || food.confidence;
+      add(
+        confidence
+          ? `${food.name} · ${confidence}`
+          : food.name,
+        "음식: ",
+      );
+    });
   }
 
-  collect(parsed);
+  addAll(parsed.objects, "사물: ");
+  addAll(parsed.activities, "활동: ");
+  addAll(parsed.visibleText, "사진 속 글자: ");
+  addAll(parsed.questionClues);
+
+  if (Number.isInteger(parsed.peopleCount) && parsed.peopleCount > 0) {
+    clues.push(`사진에 보이는 사람 ${parsed.peopleCount}명`);
+  }
+
+  if (!clues.length) {
+    const collectLegacy = (item) => {
+      if (typeof item === "string") {
+        add(item);
+      } else if (Array.isArray(item)) {
+        item.forEach(collectLegacy);
+      } else if (item && typeof item === "object") {
+        collectLegacy(
+          item.clue ??
+            item.text ??
+            item.label ??
+            item.description ??
+            item.value,
+        );
+      }
+    };
+
+    collectLegacy(parsed);
+  }
+
   return unique(clues);
 }
 
@@ -96,15 +129,15 @@ function ContextCard({ title, values, emptyText }) {
   );
 }
 
-export default function PhotoDetailPage({
-  albumId,
-  photoId,
-}) {
+export default function PhotoDetailPage({ albumId, photoId }) {
   const [album, setAlbum] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [quizSessions, setQuizSessions] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
+  const [analysisNotice, setAnalysisNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -114,17 +147,13 @@ export default function PhotoDetailPage({
         setLoading(true);
         setError("");
 
-        const [
-          albumData,
-          selectedPhoto,
-          albumPhotoData,
-          sessionPage,
-        ] = await Promise.all([
-          api.album(albumId, controller.signal),
-          api.photo(albumId, photoId, controller.signal),
-          api.albumPhotos(albumId, controller.signal),
-          api.sessions(0, controller.signal, 100),
-        ]);
+        const [albumData, selectedPhoto, albumPhotoData, sessionPage] =
+          await Promise.all([
+            api.album(albumId, controller.signal),
+            api.photo(albumId, photoId, controller.signal),
+            api.albumPhotos(albumId, controller.signal),
+            api.sessions(0, controller.signal, 100),
+          ]);
 
         const normalizedPhotos = albumPhotoData.some(
           (photo) => photo.id === selectedPhoto.id,
@@ -134,8 +163,8 @@ export default function PhotoDetailPage({
         const albumPhotoIds = new Set(
           normalizedPhotos.map((photo) => photo.id),
         );
-        const matchingSessions = sessionPage.content.filter(
-          (session) => albumPhotoIds.has(session.photo.id),
+        const matchingSessions = sessionPage.content.filter((session) =>
+          albumPhotoIds.has(session.photo.id),
         );
         const sessionDetails = await Promise.all(
           matchingSessions.map((session) =>
@@ -163,6 +192,14 @@ export default function PhotoDetailPage({
     return () => controller.abort();
   }, [albumId, photoId]);
 
+  const selectedPhoto = useMemo(
+    () =>
+      photos.find(
+        (photo) => String(photo.id) === String(photoId),
+      ),
+    [photos, photoId],
+  );
+
   const questionContext = useMemo(() => {
     const dates = unique(
       photos.map(
@@ -174,14 +211,11 @@ export default function PhotoDetailPage({
     const locations = unique(
       photos.map(
         (photo) =>
-          photo.confirmedLocation ||
-          photo.metadataLocation,
+          photo.confirmedLocation || photo.metadataLocation,
       ),
     );
     const aiClues = unique(
-      photos.flatMap((photo) =>
-        extractClues(photo.aiClues),
-      ),
+      photos.flatMap((photo) => extractClues(photo.aiClues)),
     );
 
     return { dates, locations, aiClues };
@@ -198,6 +232,32 @@ export default function PhotoDetailPage({
       ),
     [quizSessions],
   );
+
+  async function handleAnalyze() {
+    try {
+      setAnalyzing(true);
+      setAnalysisError("");
+      setAnalysisNotice("");
+
+      const analyzedPhoto = await api.analyzePhoto(albumId, photoId);
+      setPhotos((current) =>
+        current.map((photo) =>
+          String(photo.id) === String(analyzedPhoto.id)
+            ? analyzedPhoto
+            : photo,
+        ),
+      );
+      setAnalysisNotice(
+        "분석 결과를 저장했습니다. 앨범의 AI 분석 단서에 반영되었습니다.",
+      );
+    } catch (err) {
+      setAnalysisError(
+        err.message || "사진 AI 분석에 실패했습니다.",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -232,17 +292,49 @@ export default function PhotoDetailPage({
         <p className="eyebrow">ALBUM QUIZ</p>
         <h1>{album?.title || "앨범"} 회상 질문</h1>
         <p className="muted">
-          앨범의 사진 {photos.length}장에서 확인한 정보를
-          질문 생성 자료로 사용합니다.
+          앨범의 사진 {photos.length}장에서 확인한 정보를 질문 생성
+          자료로 사용합니다.
         </p>
       </div>
+
+      <section className="photo-analysis-panel">
+        <div>
+          <p className="eyebrow">SELECTED PHOTO</p>
+          <h2>{selectedPhoto?.originalFilename || "선택한 사진"}</h2>
+          <p className="hint">
+            분석을 실행하면 이 사진이 Google Gemini API로
+            전송되고, 결과는 사진의 aiClues에 저장됩니다.
+          </p>
+        </div>
+        <button
+          className="button"
+          type="button"
+          onClick={handleAnalyze}
+          disabled={analyzing}
+        >
+          {analyzing
+            ? "사진 분석 중…"
+            : selectedPhoto?.aiClues
+              ? "AI 다시 분석"
+              : "AI 사진 분석"}
+        </button>
+      </section>
+
+      {analysisError ? (
+        <p className="error" role="alert">
+          {analysisError}
+        </p>
+      ) : null}
+      {analysisNotice ? (
+        <p className="notice" role="status">
+          {analysisNotice}
+        </p>
+      ) : null}
 
       <section className="quiz-overview">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">
-              QUESTION CONTEXT
-            </p>
+            <p className="eyebrow">QUESTION CONTEXT</p>
             <h2>질문 생성에 사용할 자료</h2>
           </div>
         </div>
@@ -269,48 +361,39 @@ export default function PhotoDetailPage({
       <section className="quiz-questions">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">
-              GENERATED QUESTIONS
-            </p>
+            <p className="eyebrow">GENERATED QUESTIONS</p>
             <h2>
               생성된 회상 질문{" "}
-              <span className="count">
-                {questions.length}
-              </span>
+              <span className="count">{questions.length}</span>
             </h2>
           </div>
         </div>
 
         {!quizSessions.length ? (
           <Empty>
-            아직 이 앨범에서 생성된 질문이 없습니다.
-            사진 분석이 완료되면 생성된 질문이 여기에 표시됩니다.
+            아직 이 앨범에서 생성된 질문이 없습니다. 사진 분석이
+            완료되면 생성된 질문이 여기에 표시됩니다.
           </Empty>
         ) : !questions.length ? (
           <div className="quiz-session-status">
             {quizSessions.map((session) => (
               <p key={session.id}>
                 훈련 #{session.id} ·{" "}
-                {sessionStatusLabels[session.status] ||
-                  session.status}
+                {sessionStatusLabels[session.status] || session.status}
               </p>
             ))}
           </div>
         ) : (
           <ol className="quiz-question-list">
             {questions.map((question) => (
-              <li
-                key={`${question.sessionId}-${question.id}`}
-              >
+              <li key={`${question.sessionId}-${question.id}`}>
                 <div className="quiz-question-meta">
                   <span>
-                    {questionTypeLabels[question.type] ||
-                      question.type}
+                    {questionTypeLabels[question.type] || question.type}
                   </span>
                   <span>
-                    {sessionStatusLabels[
-                      question.sessionStatus
-                    ] || question.sessionStatus}
+                    {sessionStatusLabels[question.sessionStatus] ||
+                      question.sessionStatus}
                   </span>
                 </div>
                 <p>{question.content}</p>

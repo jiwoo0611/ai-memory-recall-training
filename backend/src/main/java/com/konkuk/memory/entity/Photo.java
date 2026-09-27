@@ -60,6 +60,7 @@ public class Photo extends BaseEntity {
     public LocalDate getConfirmedTakenOn() { return confirmedTakenOn; }
     public String getConfirmedLocation() { return confirmedLocation; }
     public String getAiClues() { return aiClues; }
+    public void updateAiClues(String aiClues) { this.aiClues = aiClues; }
     public void updateMetadate(LocalDateTime metadataTakenAt, String metadataLocation){
         this.metadataLocation = metadataLocation;
         this.metadataTakenAt = metadataTakenAt;

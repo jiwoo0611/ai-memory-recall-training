@@ -593,6 +593,23 @@ dd {
   max-width: 680px;
   line-height: 1.7;
 }
+.photo-analysis-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px;
+  border: 1px solid #dce5d8;
+  border-radius: 10px;
+  background: #f8faf6;
+}
+.photo-analysis-panel h2,
+.photo-analysis-panel p {
+  margin-bottom: 6px;
+}
+.photo-analysis-panel .button {
+  flex-shrink: 0;
+}
 .quiz-overview,
 .quiz-questions {
   padding-top: 26px;
@@ -895,6 +912,10 @@ dd {
   }
   .photo-grid {
     grid-template-columns: 1fr;
+  }
+  .photo-analysis-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
   .quiz-context-card {
     min-height: 0;
