@@ -4,6 +4,7 @@ import com.konkuk.memory.dto.PhotoConfirmRequest;
 import com.konkuk.memory.dto.PhotoResponse;
 import com.konkuk.memory.exception.ApiException;
 import com.konkuk.memory.service.FileStorageService;
+import com.konkuk.memory.service.PhotoAnalysisService;
 import com.konkuk.memory.service.PhotoDeleteService;
 import com.konkuk.memory.service.PhotoMetadataUpdateService;
 import com.konkuk.memory.service.PhotoQueryService;
@@ -30,19 +31,22 @@ public class PhotoController {
     private final PhotoMetadataUpdateService photoMetadataUpdateService;
     private final FileStorageService fileStorageService;
     private final PhotoDeleteService photoDeleteService;
+    private final PhotoAnalysisService photoAnalysisService;
 
     public PhotoController(
             PhotoUploadService photoUploadService,
             PhotoQueryService photoQueryService,
             PhotoMetadataUpdateService photoMetadataUpdateService,
             FileStorageService fileStorageService,
-            PhotoDeleteService photoDeleteService
+            PhotoDeleteService photoDeleteService,
+            PhotoAnalysisService photoAnalysisService
     ) {
         this.photoUploadService = photoUploadService;
         this.photoQueryService = photoQueryService;
         this.photoMetadataUpdateService = photoMetadataUpdateService;
         this.fileStorageService = fileStorageService;
         this.photoDeleteService = photoDeleteService;
+        this.photoAnalysisService = photoAnalysisService;
     }
 
     @PostMapping
@@ -52,12 +56,7 @@ public class PhotoController {
             @RequestParam("files") List<MultipartFile> files
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-
-        return photoUploadService.upload(
-                userId,
-                albumId,
-                files
-        );
+        return photoUploadService.upload(userId, albumId, files);
     }
 
     @GetMapping
@@ -66,11 +65,7 @@ public class PhotoController {
             @PathVariable Long albumId
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-
-        return photoQueryService.getPhotos(
-                userId,
-                albumId
-        );
+        return photoQueryService.getPhotos(userId, albumId);
     }
 
     @GetMapping("/{photoId}")
@@ -80,12 +75,17 @@ public class PhotoController {
             @PathVariable Long photoId
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
+        return photoQueryService.getPhoto(userId, albumId, photoId);
+    }
 
-        return photoQueryService.getPhoto(
-                userId,
-                albumId,
-                photoId
-        );
+    @PostMapping("/{photoId}/analyze")
+    public PhotoResponse analyzePhoto(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long albumId,
+            @PathVariable Long photoId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return photoAnalysisService.analyze(userId, albumId, photoId);
     }
 
     @GetMapping("/{photoId}/image")
@@ -95,41 +95,23 @@ public class PhotoController {
             @PathVariable Long photoId
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-
         PhotoQueryService.PhotoFile photo =
-                photoQueryService.getPhotoFile(
-                        userId,
-                        albumId,
-                        photoId
-                );
+                photoQueryService.getPhotoFile(userId, albumId, photoId);
 
         try {
-            byte[] imageBytes =
-                    fileStorageService.load(
-                            photo.storageKey()
-                    );
-
+            byte[] imageBytes = fileStorageService.load(photo.storageKey());
             MediaType mediaType;
 
             try {
-                mediaType =
-                        MediaType.parseMediaType(
-                                photo.contentType()
-                        );
+                mediaType = MediaType.parseMediaType(photo.contentType());
             } catch (Exception e) {
-                mediaType =
-                        MediaType.APPLICATION_OCTET_STREAM;
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
             }
 
-            return ResponseEntity
-                    .ok()
-                    .header(
-                            HttpHeaders.CACHE_CONTROL,
-                            "private, max-age=3600"
-                    )
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
                     .contentType(mediaType)
                     .body(imageBytes);
-
         } catch (IOException e) {
             throw new ApiException(
                     HttpStatus.NOT_FOUND,
@@ -146,13 +128,7 @@ public class PhotoController {
             @PathVariable Long photoId
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-
-        photoDeleteService.delete(
-                userId,
-                albumId,
-                photoId
-        );
-
+        photoDeleteService.delete(userId, albumId, photoId);
         return ResponseEntity.noContent().build();
     }
 
@@ -163,11 +139,6 @@ public class PhotoController {
             @Valid @RequestBody PhotoConfirmRequest request
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-
-        return photoMetadataUpdateService.confirm(
-                userId,
-                photoId,
-                request
-        );
+        return photoMetadataUpdateService.confirm(userId, photoId, request);
     }
 }

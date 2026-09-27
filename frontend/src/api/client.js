@@ -362,6 +362,12 @@ export const api = {
   uploadPhotos,
   photoImage,
 
+  analyzePhoto: (albumId, photoId) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}/analyze`,
+      { method: "POST" },
+    ),
+
   // 사진 삭제
   deletePhoto: (albumId, photoId) =>
     request(
