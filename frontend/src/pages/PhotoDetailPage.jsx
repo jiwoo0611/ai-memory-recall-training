@@ -272,8 +272,8 @@ export default function PhotoDetailPage({ albumId, photoId }) {
   if (error) {
     return (
       <section className="card">
-        <a className="back-link" href="#/mypage">
-          ← 마이페이지
+        <a className="back-link" href={`#/albums/${encodeURIComponent(albumId)}`}>
+          ← 앨범 사진 목록
         </a>
         <p className="error" role="alert">
           {error}
@@ -284,8 +284,8 @@ export default function PhotoDetailPage({ albumId, photoId }) {
 
   return (
     <section className="card photo-detail-page">
-      <a className="back-link" href="#/mypage">
-        ← 마이페이지
+      <a className="back-link" href={`#/albums/${encodeURIComponent(albumId)}`}>
+        ← 앨범 사진 목록
       </a>
 
       <div className="photo-detail-title">
