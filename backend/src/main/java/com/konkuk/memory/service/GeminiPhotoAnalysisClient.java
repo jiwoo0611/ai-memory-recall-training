@@ -256,6 +256,9 @@ public class GeminiPhotoAnalysisClient {
         if (!value.matches("[A-Za-z0-9._-]+")) {
             throw new IllegalArgumentException("Gemini model name is invalid.");
         }
+        if (value.equals("gemini-2.5-flash-lite")) {
+            return "gemini-3.5-flash-lite";
+        }
         return value;
     }
 
