@@ -138,6 +138,9 @@ export default function PhotoDetailPage({ albumId, photoId }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
   const [analysisNotice, setAnalysisNotice] = useState("");
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [questionGenerationError, setQuestionGenerationError] = useState("");
+  const [questionGenerationNotice, setQuestionGenerationNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -259,6 +262,30 @@ export default function PhotoDetailPage({ albumId, photoId }) {
     }
   }
 
+  async function handleGenerateQuestions() {
+    try {
+      setGeneratingQuestions(true);
+      setQuestionGenerationError("");
+      setQuestionGenerationNotice("");
+
+      const generatedSession = await api.generateAlbumQuestions(albumId);
+      setQuizSessions((current) => [
+        generatedSession,
+        ...current.filter(
+          (session) => session.id !== generatedSession.id,
+        ),
+      ]);
+      setQuestionGenerationNotice(
+        "앨범 전체 사진의 단서를 반영한 질문 3개를 저장했습니다.",
+      );
+    } catch (err) {
+      setQuestionGenerationError(
+        err.message || "앨범 질문 생성에 실패했습니다.",
+      );
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  }
   if (loading) {
     return (
       <section className="card">
@@ -367,12 +394,33 @@ export default function PhotoDetailPage({ albumId, photoId }) {
               <span className="count">{questions.length}</span>
             </h2>
           </div>
+          <button
+            className="button"
+            type="button"
+            onClick={handleGenerateQuestions}
+            disabled={generatingQuestions || !photos.length}
+          >
+            {generatingQuestions
+              ? "질문 생성 중…"
+              : "앨범 질문 3개 생성"}
+          </button>
         </div>
+
+        {questionGenerationError ? (
+          <p className="error" role="alert">
+            {questionGenerationError}
+          </p>
+        ) : null}
+        {questionGenerationNotice ? (
+          <p className="notice" role="status">
+            {questionGenerationNotice}
+          </p>
+        ) : null}
 
         {!quizSessions.length ? (
           <Empty>
-            아직 이 앨범에서 생성된 질문이 없습니다. 사진 분석이
-            완료되면 생성된 질문이 여기에 표시됩니다.
+            아직 이 앨범에서 생성된 질문이 없습니다. 위 버튼을 눌러
+            앨범 전체 사진의 단서로 질문을 만들어보세요.
           </Empty>
         ) : !questions.length ? (
           <div className="quiz-session-status">

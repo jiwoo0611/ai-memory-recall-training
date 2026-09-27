@@ -2,7 +2,9 @@ package com.konkuk.memory.controller;
 
 import com.konkuk.memory.dto.AlbumCreateRequest;
 import com.konkuk.memory.dto.AlbumResponse;
+import com.konkuk.memory.dto.TrainingSessionDetailResponse;
 import com.konkuk.memory.service.AlbumService;
+import com.konkuk.memory.service.AlbumQuestionGenerationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,9 +18,14 @@ import java.util.List;
 public class AlbumController {
 
     private final AlbumService albumService;
+    private final AlbumQuestionGenerationService questionGenerationService;
 
-    public AlbumController(AlbumService albumService) {
+    public AlbumController(
+            AlbumService albumService,
+            AlbumQuestionGenerationService questionGenerationService
+    ) {
         this.albumService = albumService;
+        this.questionGenerationService = questionGenerationService;
     }
 
     @PostMapping
@@ -48,6 +55,15 @@ public class AlbumController {
         Long userId = Long.valueOf(jwt.getSubject());
 
         return albumService.getAlbum(userId, albumId);
+    }
+
+    @PostMapping("/{albumId}/questions/generate")
+    public TrainingSessionDetailResponse generateQuestions(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long albumId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return questionGenerationService.generate(userId, albumId);
     }
 
     @DeleteMapping("/{albumId}")

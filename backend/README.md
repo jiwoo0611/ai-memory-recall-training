@@ -3,8 +3,8 @@
 현재 로컬 MySQL 9.2 / root / memory_recall 연결 및 실제 검증 절차는 [로컬 MySQL 실행 안내](docs/LOCAL_MYSQL.md)를 참고하세요.
 아래의 memory_app 생성 안내는 별도 개발 계정을 만들 때의 예시이며, 이미 생성한 로컬 DB를 다시 만들 필요는 없습니다.
 
-`project konkuk.txt`를 기준으로 서버·DB 기반, 회원가입, 로그인, JWT 인증, 마이페이지 조회 API를 구현했습니다.
-사진 업로드/파일 조회, 사진 분석, 질문 생성, 답변 제출/평가, 결과 생성 API와 프론트엔드는 아직 구현하지 않았습니다.
+`project konkuk.txt`를 기준으로 회원가입, 로그인, JWT 인증, 앨범·사진 관리, Gemini 사진 분석, 앨범 단위 질문 생성, 마이페이지 조회 API와 프론트 연결을 구현했습니다.
+답변 제출·평가와 결과 생성은 후속 구현 범위입니다.
 `GET /api/users/me`는 id/name/email/createdAt/updatedAt을 반환합니다.
 마이페이지의 추가·수정 파일, API 응답, 테스트 방법은 [마이페이지 API 문서](docs/MY_PAGE.md)를 참고하세요.
 
@@ -125,6 +125,7 @@ project/
 | GET    | `/api/users/me/photos`                        | Bearer JWT 필수 | 200, 본인 사진 목록 및 페이지 정보     |
 | GET    | `/api/users/me/training-sessions`             | Bearer JWT 필수 | 200, 본인 훈련 목록 및 페이지 정보     |
 | GET    | `/api/users/me/training-sessions/{sessionId}` | Bearer JWT 필수 | 200, 본인 훈련의 사진·질문·답변·결과   |
+| POST   | `/api/albums/{albumId}/questions/generate`    | Bearer JWT 필수 | 200, 앨범 통합 근거로 생성한 질문 3개   |
 
 회원가입: JSON → 이메일 공백 제거·소문자 통일 / 이름 바깥 공백 제거 → Validation →
 BCrypt 72바이트 제한 확인 → 이메일 중복 확인 → BCrypt(cost 12) 해시 → DB 저장 → 사용자 DTO 반환.
