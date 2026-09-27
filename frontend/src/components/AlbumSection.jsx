@@ -336,21 +336,21 @@ export default function AlbumSection({ albumId }) {
               flexWrap: "wrap",
             }}
           >
+            {albumPhotos.length > 0 && (
+              <button
+                className="button"
+                type="button"
+                onClick={handleGenerateQuestions}
+                disabled={generatingQuestions || deletingSelected}
+              >
+                {generatingQuestions
+                  ? "사진 분석·질문 생성 중…"
+                  : "앨범 회상 질문 생성"}
+              </button>
+            )}
+
             {!selectionMode ? (
               <>
-                {albumPhotos.length > 0 && (
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={handleGenerateQuestions}
-                    disabled={generatingQuestions}
-                  >
-                    {generatingQuestions
-                      ? "사진 분석·질문 생성 중…"
-                      : "앨범 회상 질문 생성"}
-                  </button>
-                )}
-
                 {albumPhotos.length > 0 && (
                   <button
                     type="button"
