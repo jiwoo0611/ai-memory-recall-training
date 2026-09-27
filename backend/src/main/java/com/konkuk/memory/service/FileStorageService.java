@@ -1,11 +1,14 @@
 package com.konkuk.memory.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -15,7 +18,7 @@ public class FileStorageService {
             Paths.get("uploads").toAbsolutePath().normalize();
 
     public String store(
-            byte[] imageBytes,
+            MultipartFile file,
             Long userId,
             Long albumId,
             String extension
@@ -38,7 +41,14 @@ public class FileStorageService {
             throw new IOException("잘못된 파일 저장 경로입니다.");
         }
 
-        Files.write(destination, imageBytes);
+        // 사진 전체를 byte[]로 만들지 않고 스트리밍으로 저장
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(
+                    inputStream,
+                    destination,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+        }
 
         return rootLocation
                 .relativize(destination)

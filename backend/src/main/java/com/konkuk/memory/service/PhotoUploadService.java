@@ -36,7 +36,6 @@ public class PhotoUploadService {
 
     private final ImageValidationService imageValidationService;
     private final PhotoMetadataService photoMetadataService;
-    private final ImageRotationService imageRotationService;
     private final FileStorageService fileStorageService;
 
     public PhotoUploadService(
@@ -45,7 +44,6 @@ public class PhotoUploadService {
             PhotoRepository photoRepository,
             ImageValidationService imageValidationService,
             PhotoMetadataService photoMetadataService,
-            ImageRotationService imageRotationService,
             FileStorageService fileStorageService
     ){
         this.albumRepository = albumRepository;
@@ -53,7 +51,6 @@ public class PhotoUploadService {
         this.photoRepository = photoRepository;
         this.imageValidationService = imageValidationService;
         this.photoMetadataService = photoMetadataService;
-        this.imageRotationService = imageRotationService;
         this.fileStorageService = fileStorageService;
     }
 
@@ -95,16 +92,20 @@ public class PhotoUploadService {
 
                 PhotoMetadata metadata = photoMetadataService.extract(file);
 
-                byte[] correctedImage = imageRotationService.correctRotation(file,metadata.orienation());
-
                 String extension = getExtension(file.getContentType());
 
-                String storageKey = fileStorageService.store(correctedImage, userId,albumId,extension);
+                String storageKey =
+                        fileStorageService.store(
+                                file,
+                                userId,
+                                albumId,
+                                extension
+                        );
 
                 storedFiles.add(storageKey);
 
                 Photo photo = new Photo(
-                        user, album, storageKey, file.getOriginalFilename(), file.getContentType(), correctedImage.length
+                        user, album, storageKey, file.getOriginalFilename(), file.getContentType(), file.getSize()
                 );
 
                 photo.updateMetadate(metadata.takenAt(), metadata.location());
