@@ -27,7 +27,6 @@ public class ImageValidationService {
         validateSize(file);
         validateContentType(file);
         validateMagicBytes(file);
-        validateImageCanBeDecoded(file);
     }
 
     private void validateNotEmpty(MultipartFile file) {
