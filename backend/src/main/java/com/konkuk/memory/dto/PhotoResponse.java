@@ -16,7 +16,9 @@ public record PhotoResponse(
         String metadataLocation,
 
         LocalDate confirmedTakenOn,
-        String confirmedLocation
+        String confirmedLocation,
+
+        String aiClues
 ) {
 
     public static PhotoResponse from(Photo photo) {
@@ -29,7 +31,8 @@ public record PhotoResponse(
                 photo.getMetadataTakenAt(),
                 photo.getMetadataLocation(),
                 photo.getConfirmedTakenOn(),
-                photo.getConfirmedLocation()
+                photo.getConfirmedLocation(),
+                photo.getAiClues()
         );
     }
 }

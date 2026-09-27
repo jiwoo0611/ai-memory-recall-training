@@ -380,9 +380,9 @@ export const api = {
       },
     ),
 
-  sessions: (page = 0, signal) =>
+  sessions: (page = 0, signal, size = 6) =>
     request(
-      `/api/users/me/training-sessions?page=${page}&size=6`,
+      `/api/users/me/training-sessions?page=${page}&size=${size}`,
       {
         signal,
       },
