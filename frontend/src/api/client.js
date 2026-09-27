@@ -365,7 +365,9 @@ export const api = {
   analyzePhoto: (albumId, photoId) =>
     request(
       `/api/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}/analyze`,
-      { method: "POST" },
+      {
+        method: "POST",
+      },
     ),
   generateAlbumQuestions: (albumId) =>
     request(
@@ -373,12 +375,22 @@ export const api = {
       { method: "POST" },
     ),
 
-  // 사진 삭제
+  // 사진 한 장 삭제
   deletePhoto: (albumId, photoId) =>
     request(
       `/api/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}`,
       {
         method: "DELETE",
+      },
+    ),
+
+  // 선택한 사진 여러 장 삭제
+  deleteSelectedPhotos: (albumId, photoIds) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}/photos`,
+      {
+        method: "DELETE",
+        body: { photoIds },
       },
     ),
 
