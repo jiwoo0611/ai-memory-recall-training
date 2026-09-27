@@ -25,6 +25,11 @@ export default function AlbumSection() {
   const [deletingPhotoId, setDeletingPhotoId] = useState(null);
   const [deletingAlbumId, setDeletingAlbumId] = useState(null);
 
+  // 사진 선택 삭제
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
+
   const fileInputRef = useRef(null);
 
   const loadAlbums = async () => {
@@ -87,6 +92,8 @@ export default function AlbumSection() {
     try {
       setSelectedAlbum(album);
       setAlbumPhotos([]);
+      setSelectedPhotoIds([]);
+      setSelectionMode(false);
       setUploadError("");
       setError("");
 
@@ -163,6 +170,75 @@ export default function AlbumSection() {
     }
   };
 
+  const handleTogglePhoto = (photoId) => {
+    setSelectedPhotoIds((previous) => {
+      if (previous.includes(photoId)) {
+        return previous.filter(
+          (id) => id !== photoId,
+        );
+      }
+
+      return [...previous, photoId];
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (
+      selectedPhotoIds.length === albumPhotos.length
+    ) {
+      setSelectedPhotoIds([]);
+      return;
+    }
+
+    setSelectedPhotoIds(
+      albumPhotos.map((photo) => photo.id),
+    );
+  };
+
+  const handleCancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedPhotoIds([]);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedAlbum || !selectedPhotoIds.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `선택한 사진 ${selectedPhotoIds.length}장을 삭제할까요?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingSelected(true);
+      setUploadError("");
+
+      await api.deleteSelectedPhotos(
+        selectedAlbum.id,
+        selectedPhotoIds,
+      );
+
+      setAlbumPhotos((previous) =>
+        previous.filter(
+          (photo) =>
+            !selectedPhotoIds.includes(photo.id),
+        ),
+      );
+
+      setSelectedPhotoIds([]);
+      setSelectionMode(false);
+    } catch (err) {
+      setUploadError(
+        err.message ||
+          "선택한 사진 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleDeleteAlbum = async (event, album) => {
     event.stopPropagation();
 
@@ -202,6 +278,8 @@ export default function AlbumSection() {
               onClick={() => {
                 setSelectedAlbum(null);
                 setAlbumPhotos([]);
+                setSelectedPhotoIds([]);
+                setSelectionMode(false);
                 setUploadError("");
               }}
             >
@@ -211,27 +289,82 @@ export default function AlbumSection() {
             <h2>{selectedAlbum.title}</h2>
           </div>
 
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-              onChange={handleUpload}
-            />
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            {!selectionMode ? (
+              <>
+                {albumPhotos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectionMode(true)
+                    }
+                  >
+                    선택
+                  </button>
+                )}
 
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() =>
-                fileInputRef.current?.click()
-              }
-            >
-              {uploading
-                ? "업로드 중..."
-                : "+ 사진 추가"}
-            </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={handleUpload}
+                />
+
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() =>
+                    fileInputRef.current?.click()
+                  }
+                >
+                  {uploading
+                    ? "업로드 중..."
+                    : "+ 사진 추가"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  disabled={deletingSelected}
+                >
+                  {selectedPhotoIds.length ===
+                  albumPhotos.length
+                    ? "전체 선택 해제"
+                    : "전체 선택"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={
+                    deletingSelected ||
+                    selectedPhotoIds.length === 0
+                  }
+                >
+                  {deletingSelected
+                    ? "삭제 중..."
+                    : `선택 삭제 (${selectedPhotoIds.length})`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCancelSelection}
+                  disabled={deletingSelected}
+                >
+                  취소
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -247,65 +380,157 @@ export default function AlbumSection() {
           </Empty>
         ) : (
           <div className="photo-grid">
-            {albumPhotos.map((photo) => (
-              <article
-                className="photo-item"
-                key={photo.id}
-              >
-                <a
-                  className="photo-open"
-                  href={`#/albums/${selectedAlbum.id}/photos/${photo.id}`}
-                  aria-label={`${photo.originalFilename} 상세 보기`}
-                >
-                  <PhotoImage
-                    albumId={selectedAlbum.id}
-                    photo={photo}
-                  />
+            {albumPhotos.map((photo) => {
+              const isSelected =
+                selectedPhotoIds.includes(photo.id);
 
-                  <h3>{photo.originalFilename}</h3>
-
-                  <p className="muted">
-                    {photo.contentType} ·{" "}
-                    {(photo.sizeBytes / 1024).toFixed(1)} KB
-                  </p>
-
-                  <dl>
-                    <div>
-                      <dt>촬영일</dt>
-                      <dd>
-                        {photo.confirmedTakenOn ||
-                          photo.metadataTakenAt ||
-                          "미등록"}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt>장소</dt>
-                      <dd>
-                        {photo.confirmedLocation ||
-                          photo.metadataLocation ||
-                          "미등록"}
-                      </dd>
-                    </div>
-                  </dl>
-                </a>
-
-                <button
-                  type="button"
-                  disabled={deletingPhotoId === photo.id}
-                  onClick={() =>
-                    handleDeletePhoto(photo)
-                  }
+              return (
+                <article
+                  className="photo-item"
+                  key={photo.id}
                   style={{
-                    marginTop: "16px",
+                    position: "relative",
+                    outline: isSelected
+                      ? "3px solid currentColor"
+                      : "none",
+                    cursor: selectionMode
+                      ? "pointer"
+                      : "default",
                   }}
+                  onClick={
+                    selectionMode
+                      ? () =>
+                          handleTogglePhoto(photo.id)
+                      : undefined
+                  }
                 >
-                  {deletingPhotoId === photo.id
-                    ? "삭제 중..."
-                    : "삭제"}
-                </button>
-              </article>
-            ))}
+                  {selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() =>
+                        handleTogglePhoto(photo.id)
+                      }
+                      onClick={(event) =>
+                        event.stopPropagation()
+                      }
+                      aria-label={`${photo.originalFilename} 선택`}
+                      style={{
+                        position: "absolute",
+                        top: "12px",
+                        right: "12px",
+                        width: "20px",
+                        height: "20px",
+                        zIndex: 2,
+                      }}
+                    />
+                  )}
+
+                  {selectionMode ? (
+                    <div>
+                      <PhotoImage
+                        albumId={selectedAlbum.id}
+                        photo={photo}
+                      />
+
+                      <h3>
+                        {photo.originalFilename}
+                      </h3>
+
+                      <p className="muted">
+                        {photo.contentType} ·{" "}
+                        {(photo.sizeBytes / 1024).toFixed(
+                          1,
+                        )}{" "}
+                        KB
+                      </p>
+
+                      <dl>
+                        <div>
+                          <dt>촬영일</dt>
+                          <dd>
+                            {photo.confirmedTakenOn ||
+                              photo.metadataTakenAt ||
+                              "미등록"}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt>장소</dt>
+                          <dd>
+                            {photo.confirmedLocation ||
+                              photo.metadataLocation ||
+                              "미등록"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  ) : (
+                    <>
+                      <a
+                        className="photo-open"
+                        href={`#/albums/${selectedAlbum.id}/photos/${photo.id}`}
+                        aria-label={`${photo.originalFilename} 상세 보기`}
+                      >
+                        <PhotoImage
+                          albumId={selectedAlbum.id}
+                          photo={photo}
+                        />
+
+                        <h3>
+                          {photo.originalFilename}
+                        </h3>
+
+                        <p className="muted">
+                          {photo.contentType} ·{" "}
+                          {(photo.sizeBytes / 1024).toFixed(
+                            1,
+                          )}{" "}
+                          KB
+                        </p>
+
+                        <dl>
+                          <div>
+                            <dt>촬영일</dt>
+                            <dd>
+                              {photo.confirmedTakenOn ||
+                                photo.metadataTakenAt ||
+                                "미등록"}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt>장소</dt>
+                            <dd>
+                              {photo.confirmedLocation ||
+                                photo.metadataLocation ||
+                                "미등록"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </a>
+
+                      <button
+                        type="button"
+                        disabled={
+                          deletingPhotoId === photo.id
+                        }
+                        onClick={() =>
+                          handleDeletePhoto(photo)
+                        }
+                        style={{
+                          marginTop: "16px",
+                        }}
+                      >
+                        {deletingPhotoId === photo.id
+                          ? "삭제 중..."
+                          : "삭제"}
+                      </button>
+                    </>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
@@ -400,7 +625,9 @@ export default function AlbumSection() {
 
               <button
                 type="button"
-                disabled={deletingAlbumId === album.id}
+                disabled={
+                  deletingAlbumId === album.id
+                }
                 onClick={(event) =>
                   handleDeleteAlbum(event, album)
                 }
