@@ -7,13 +7,16 @@ import PhotoDetailPage from "./pages/PhotoDetailPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
 // Authentication redirects replace the current entry; ordinary links keep history.
-const redirect = (path) => location.replace(`#${path}`);
+const redirect = (path) => {
+  if (location.hash !== `#${path}`) location.replace(`#${path}`);
+};
 export default function App() {
   const [page, setPage] = useState(route);
   const [auth, setAuth] = useState(session);
   const [notice, setNotice] = useState("");
   const [logoutError, setLogoutError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const albumRoute = page.match(/^\/albums\/([^/]+)$/);
   const photoRoute = page.match(
     /^\/albums\/([^/]+)\/photos\/([^/]+)$/,
   );
@@ -52,11 +55,9 @@ export default function App() {
     };
   }, [auth]);
   useEffect(() => {
-    if ((page === "/mypage" || photoRoute) && !auth) {
+    if ((page === "/mypage" || albumRoute || photoRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
       redirect("/login");
-    } else if (auth && (page === "/login" || page === "/signup")) {
-      redirect("/mypage");
     }
   }, [page, auth]);
   async function logout() {
@@ -102,9 +103,12 @@ export default function App() {
         }}
       />
     );
-  else if (page === "/mypage")
+  else if (page === "/mypage" || albumRoute)
     content = auth ? (
-      <MyPage key={auth.accessToken} />
+      <MyPage
+        key={auth.accessToken}
+        albumId={albumRoute ? decodeURIComponent(albumRoute[1]) : undefined}
+      />
     ) : (
       <p role="status">로그인 화면으로 이동합니다…</p>
     );
@@ -151,7 +155,7 @@ export default function App() {
             <>
               <a
                 href="#/mypage"
-                aria-current={page === "/mypage" || photoRoute ? "page" : undefined}
+                aria-current={page === "/mypage" || albumRoute || photoRoute ? "page" : undefined}
               >
                 마이페이지
               </a>
