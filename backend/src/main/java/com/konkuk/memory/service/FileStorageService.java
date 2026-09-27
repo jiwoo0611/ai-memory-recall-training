@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 @Service
@@ -51,10 +52,15 @@ public class FileStorageService {
                             .contentLength(file.getSize())
                             .build();
 
-            r2Client.putObject(
-                    request,
-                    RequestBody.fromBytes(file.getBytes())
-            );
+            try (InputStream inputStream = file.getInputStream()) {
+                r2Client.putObject(
+                        request,
+                        RequestBody.fromInputStream(
+                                inputStream,
+                                file.getSize()
+                        )
+                );
+            }
 
             return storageKey;
 
