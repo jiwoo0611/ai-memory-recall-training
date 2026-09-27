@@ -20,30 +20,25 @@ class GeminiQuestionGenerationClientTest {
             );
 
     @Test
-    void normalizesExactlyThreeQuestionsAndKeepsOwnedEvidenceIds() throws Exception {
+    void normalizesVariableMultipleChoiceQuestionsAndKeepsOwnedEvidenceIds() throws Exception {
         String output = """
                 {
                   "questions": [
                     {
-                      "focus": "피자와 캠핑 일러스트",
-                      "type": "EXPERIENCE",
-                      "evidencePhotoIds": [11, 12, 999],
-                      "verifiable": false,
-                      "referenceInformation": ""
-                    },
-                    {
-                      "focus": "사진마다 보이는 음식",
+                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
                       "type": "PHOTO_CLUE",
-                      "evidencePhotoIds": [11, 12],
-                      "verifiable": false,
-                      "referenceInformation": ""
+                      "options": ["피자", "초밥", "냉면", "비빔밥"],
+                      "correctOptionIndex": 0,
+                      "evidencePhotoIds": [11, 999],
+                      "referenceInformation": "사진 11의 foods에 피자가 기록됨"
                     },
                     {
-                      "focus": "2026년 5월 9일 촬영 날짜",
-                      "type": "INFORMATION_CHECK",
+                      "content": "그날 사진에 남아 있던 상표는 무엇인가요?",
+                      "type": "CONTEXT",
+                      "options": ["Dewar's", "Nike", "Apple", "Coca-Cola"],
+                      "correctOptionIndex": 0,
                       "evidencePhotoIds": [12],
-                      "verifiable": true,
-                      "referenceInformation": "EXIF 촬영일: 2026-05-09"
+                      "referenceInformation": "사진 12의 visibleText에 Dewar's가 기록됨"
                     }
                   ]
                 }
@@ -51,28 +46,73 @@ class GeminiQuestionGenerationClientTest {
 
         var questions = client.normalize(output, Set.of(11L, 12L));
 
-        assertThat(questions).hasSize(3);
-        assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L, 12L);
-        assertThat(questions.get(0).verifiable()).isFalse();
-        assertThat(questions.get(0).content())
-                .isEqualTo("사진에서 확인된 단서 가운데 “피자와 캠핑 일러스트”에 관한 개인적인 기억이 있다면 이야기해 주세요.");
-        assertThat(questions.get(0).content()).doesNotContain("찍던 날");
-        assertThat(questions.get(2).type()).isEqualTo(Question.Type.INFORMATION_CHECK);
-        assertThat(questions.get(2).verifiable()).isTrue();
-        assertThat(questions.get(2).referenceInformation())
-                .isEqualTo("EXIF 촬영일: 2026-05-09");
+        assertThat(questions).hasSize(2);
+        assertThat(questions.get(0).content()).isEqualTo("이 여행에서 먹었던 음식은 무엇인가요?");
+        assertThat(questions.get(0).options()).containsExactly("피자", "초밥", "냉면", "비빔밥");
+        assertThat(questions.get(0).correctOptionIndex()).isZero();
+        assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L);
+        assertThat(questions.get(0).verifiable()).isTrue();
+        assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-v4");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v1");
     }
 
     @Test
-    void rejectsQuestionWithoutAnOwnedEvidencePhoto() {
+    void rejectsQuestionWithoutFourUniqueOptions() {
         String output = """
                 {
                   "questions": [
-                    {"focus":"첫 번째 단서", "type":"EXPERIENCE", "evidencePhotoIds":[999], "verifiable":false, "referenceInformation":""},
-                    {"focus":"두 번째 단서", "type":"PHOTO_CLUE", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""},
-                    {"focus":"세 번째 단서", "type":"CONTEXT", "evidencePhotoIds":[11], "verifiable":false, "referenceInformation":""}
+                    {
+                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
+                      "type": "PHOTO_CLUE",
+                      "options": ["피자", "피자", "냉면", "비빔밥"],
+                      "correctOptionIndex": 0,
+                      "evidencePhotoIds": [11],
+                      "referenceInformation": "foods 근거"
+                    }
+                  ]
+                }
+                """;
+
+        assertThatThrownBy(() -> client.normalize(output, Set.of(11L)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
+    }
+
+    @Test
+    void rejectsPeopleCountQuestions() {
+        String output = """
+                {
+                  "questions": [
+                    {
+                      "content": "사진 속 사람은 몇 명이었나요?",
+                      "type": "PHOTO_CLUE",
+                      "options": ["1명", "2명", "3명", "4명"],
+                      "correctOptionIndex": 1,
+                      "evidencePhotoIds": [11],
+                      "referenceInformation": "사람 수"
+                    }
+                  ]
+                }
+                """;
+
+        assertThatThrownBy(() -> client.normalize(output, Set.of(11L)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsQuestionWithoutOwnedEvidencePhoto() {
+        String output = """
+                {
+                  "questions": [
+                    {
+                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
+                      "type": "PHOTO_CLUE",
+                      "options": ["피자", "초밥", "냉면", "비빔밥"],
+                      "correctOptionIndex": 0,
+                      "evidencePhotoIds": [999],
+                      "referenceInformation": "foods 근거"
+                    }
                   ]
                 }
                 """;

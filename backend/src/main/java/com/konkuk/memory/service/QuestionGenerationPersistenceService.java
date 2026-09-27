@@ -69,7 +69,10 @@ public class QuestionGenerationPersistenceService {
                     evidenceSnapshot(albumEvidenceJson, item.evidencePhotoIds()),
                     item.verifiable(),
                     item.referenceInformation(),
-                    generationVersion
+                    generationVersion,
+                    Question.Format.MULTIPLE_CHOICE,
+                    writeJson(item.options()),
+                    answerKey(item.correctOptionIndex())
             ));
         }
         session.markInProgress();
@@ -90,10 +93,7 @@ public class QuestionGenerationPersistenceService {
                 ));
     }
 
-    private String evidenceSnapshot(
-            String albumEvidenceJson,
-            List<Long> evidencePhotoIds
-    ) {
+    private String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds) {
         try {
             ObjectNode snapshot = objectMapper.createObjectNode();
             snapshot.put("scope", "ALBUM");
@@ -101,11 +101,29 @@ public class QuestionGenerationPersistenceService {
             snapshot.set("evidencePhotoIds", objectMapper.valueToTree(evidencePhotoIds));
             return objectMapper.writeValueAsString(snapshot);
         } catch (JsonProcessingException ex) {
-            throw new ApiException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "QUESTION_EVIDENCE_FAILED",
-                    "질문 근거를 저장하지 못했습니다."
-            );
+            throw storageFailure();
         }
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            throw storageFailure();
+        }
+    }
+
+    private String answerKey(int correctOptionIndex) {
+        ObjectNode answer = objectMapper.createObjectNode();
+        answer.put("correctOptionIndex", correctOptionIndex);
+        return answer.toString();
+    }
+
+    private static ApiException storageFailure() {
+        return new ApiException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "QUESTION_EVIDENCE_FAILED",
+                "질문 정보를 저장하지 못했습니다."
+        );
     }
 }
