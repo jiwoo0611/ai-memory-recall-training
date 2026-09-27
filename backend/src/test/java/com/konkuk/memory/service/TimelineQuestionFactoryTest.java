@@ -42,6 +42,7 @@ class TimelineQuestionFactoryTest {
         assertThat(question.options().get(question.correctOptionIndex()))
                 .isEqualTo("캠핑 준비 → 피자 → Dewar's");
         assertThat(question.evidencePhotoIds()).containsExactly(11L, 12L, 13L);
+        assertThat(question.displayPhotoIds()).containsExactly(11L, 12L, 13L);
     }
 
     @Test

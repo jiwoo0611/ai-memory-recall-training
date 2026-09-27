@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MyPage from "./pages/MyPage";
 import PhotoDetailPage from "./pages/PhotoDetailPage";
+import QuizPage from "./pages/QuizPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
 // Authentication redirects replace the current entry; ordinary links keep history.
@@ -17,6 +18,7 @@ export default function App() {
   const [logoutError, setLogoutError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const albumRoute = page.match(/^\/albums\/([^/]+)$/);
+  const quizRoute = page.match(/^\/albums\/([^/]+)\/quiz\/([^/]+)$/);
   const photoRoute = page.match(
     /^\/albums\/([^/]+)\/photos\/([^/]+)$/,
   );
@@ -55,7 +57,7 @@ export default function App() {
     };
   }, [auth]);
   useEffect(() => {
-    if ((page === "/mypage" || albumRoute || photoRoute) && !auth) {
+    if ((page === "/mypage" || albumRoute || quizRoute || photoRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
       redirect("/login");
     }
@@ -112,6 +114,15 @@ export default function App() {
     ) : (
       <p role="status">로그인 화면으로 이동합니다…</p>
     );
+  else if (quizRoute)
+    content = auth ? (
+      <QuizPage
+        albumId={decodeURIComponent(quizRoute[1])}
+        sessionId={decodeURIComponent(quizRoute[2])}
+      />
+    ) : (
+      <p role="status">로그인 화면으로 이동합니다…</p>
+    );
   else if (photoRoute)
     content = auth ? (
       <PhotoDetailPage
@@ -155,7 +166,7 @@ export default function App() {
             <>
               <a
                 href="#/mypage"
-                aria-current={page === "/mypage" || albumRoute || photoRoute ? "page" : undefined}
+                aria-current={page === "/mypage" || albumRoute || quizRoute || photoRoute ? "page" : undefined}
               >
                 마이페이지
               </a>

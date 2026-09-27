@@ -1,6 +1,8 @@
 package com.konkuk.memory.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.konkuk.memory.entity.Question;
 import com.konkuk.memory.exception.ApiException;
 import org.junit.jupiter.api.Test;
@@ -12,113 +14,93 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GeminiQuestionGenerationClientTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final GeminiQuestionGenerationClient client =
             new GeminiQuestionGenerationClient(
                     "test-key",
                     "gemini-3.5-flash-lite",
-                    new ObjectMapper()
+                    objectMapper
             );
 
     @Test
-    void normalizesVariableMultipleChoiceQuestionsAndKeepsOwnedEvidenceIds() throws Exception {
-        String output = """
-                {
-                  "questions": [
-                    {
-                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
-                      "type": "PHOTO_CLUE",
-                      "options": ["피자", "초밥", "냉면", "비빔밥"],
-                      "correctOptionIndex": 0,
-                      "evidencePhotoIds": [11, 999],
-                      "referenceInformation": "사진 11의 foods에 피자가 기록됨"
-                    },
-                    {
-                      "content": "그날 사진에 남아 있던 상표는 무엇인가요?",
-                      "type": "CONTEXT",
-                      "options": ["Dewar's", "Nike", "Apple", "Coca-Cola"],
-                      "correctOptionIndex": 0,
-                      "evidencePhotoIds": [12],
-                      "referenceInformation": "사진 12의 visibleText에 Dewar's가 기록됨"
-                    }
-                  ]
-                }
-                """;
+    void normalizesEightQuestionsWithShownAndHiddenPhotoModes() throws Exception {
+        var questions = client.normalize(validOutput(8), Set.of(11L));
 
-        var questions = client.normalize(output, Set.of(11L, 12L));
-
-        assertThat(questions).hasSize(2);
-        assertThat(questions.get(0).content()).isEqualTo("이 여행에서 먹었던 음식은 무엇인가요?");
-        assertThat(questions.get(0).options()).containsExactly("피자", "초밥", "냉면", "비빔밥");
+        assertThat(questions).hasSize(8);
+        assertThat(questions.get(0).content()).isEqualTo("이때 기억나는 단서 1은 무엇인가요?");
+        assertThat(questions.get(0).options()).containsExactly("정답 1", "오답 1-A", "오답 1-B", "오답 1-C");
         assertThat(questions.get(0).correctOptionIndex()).isZero();
         assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L);
+        assertThat(questions.get(0).displayPhotoIds()).containsExactly(11L);
+        assertThat(questions.get(2).displayPhotoIds()).isEmpty();
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v1");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v2");
     }
 
     @Test
-    void rejectsQuestionWithoutFourUniqueOptions() {
-        String output = """
-                {
-                  "questions": [
-                    {
-                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
-                      "type": "PHOTO_CLUE",
-                      "options": ["피자", "피자", "냉면", "비빔밥"],
-                      "correctOptionIndex": 0,
-                      "evidencePhotoIds": [11],
-                      "referenceInformation": "foods 근거"
-                    }
-                  ]
-                }
-                """;
-
-        assertThatThrownBy(() -> client.normalize(output, Set.of(11L)))
+    void rejectsFewerThanEightQuestions() throws Exception {
+        assertThatThrownBy(() -> client.normalize(validOutput(7), Set.of(11L)))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
     }
 
     @Test
-    void rejectsPeopleCountQuestions() {
-        String output = """
-                {
-                  "questions": [
-                    {
-                      "content": "사진 속 사람은 몇 명이었나요?",
-                      "type": "PHOTO_CLUE",
-                      "options": ["1명", "2명", "3명", "4명"],
-                      "correctOptionIndex": 1,
-                      "evidencePhotoIds": [11],
-                      "referenceInformation": "사람 수"
-                    }
-                  ]
-                }
-                """;
+    void rejectsQuestionWithoutFourUniqueOptions() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ObjectNode first = (ObjectNode) root.path("questions").path(0);
+        first.set("options", objectMapper.valueToTree(
+                new String[]{"정답 1", "정답 1", "오답 1-B", "오답 1-C"}
+        ));
 
-        assertThatThrownBy(() -> client.normalize(output, Set.of(11L)))
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
+    }
+
+    @Test
+    void rejectsPeopleCountQuestions() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "사진 속 사람은 몇 명이었나요?");
+
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L)))
                 .isInstanceOf(ApiException.class);
     }
 
     @Test
-    void rejectsQuestionWithoutOwnedEvidencePhoto() {
-        String output = """
-                {
-                  "questions": [
-                    {
-                      "content": "이 여행에서 먹었던 음식은 무엇인가요?",
-                      "type": "PHOTO_CLUE",
-                      "options": ["피자", "초밥", "냉면", "비빔밥"],
-                      "correctOptionIndex": 0,
-                      "evidencePhotoIds": [999],
-                      "referenceInformation": "foods 근거"
-                    }
-                  ]
-                }
-                """;
+    void rejectsDisplayPhotoOutsideQuestionEvidence() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ObjectNode first = (ObjectNode) root.path("questions").path(0);
+        first.set("displayPhotoIds", objectMapper.valueToTree(new Long[]{12L}));
 
-        assertThatThrownBy(() -> client.normalize(output, Set.of(11L)))
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
+    }
+
+    private String validOutput(int count) throws Exception {
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode questions = root.putArray("questions");
+        for (int index = 0; index < count; index++) {
+            int number = index + 1;
+            ObjectNode question = questions.addObject();
+            question.put("content", "이때 기억나는 단서 " + number + "은 무엇인가요?");
+            question.put("type", index % 2 == 0 ? "PHOTO_CLUE" : "CONTEXT");
+            question.set("options", objectMapper.valueToTree(new String[]{
+                    "정답 " + number,
+                    "오답 " + number + "-A",
+                    "오답 " + number + "-B",
+                    "오답 " + number + "-C"
+            }));
+            question.put("correctOptionIndex", 0);
+            question.set("evidencePhotoIds", objectMapper.valueToTree(new Long[]{11L}));
+            question.set("displayPhotoIds", objectMapper.valueToTree(
+                    index < 2 ? new Long[]{11L} : new Long[]{}
+            ));
+            question.put("referenceInformation", "사진 11의 AI 단서 " + number);
+        }
+        return objectMapper.writeValueAsString(root);
     }
 }

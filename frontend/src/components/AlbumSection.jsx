@@ -266,6 +266,7 @@ export default function AlbumSection({ albumId }) {
       setQuestionGenerationNotice(
         `앨범 전체 사진으로 회상 질문 ${generatedSession.questions.length}개를 만들었습니다.`,
       );
+      location.hash = `#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(generatedSession.id)}`;
     } catch (err) {
       setQuestionGenerationError(
         err.message || "앨범 질문 생성에 실패했습니다.",
@@ -345,7 +346,7 @@ export default function AlbumSection({ albumId }) {
               >
                 {generatingQuestions
                   ? "사진 분석·질문 생성 중…"
-                  : "앨범 회상 질문 생성"}
+                  : "새 퀴즈 생성·시작"}
               </button>
             )}
 
@@ -591,10 +592,10 @@ export default function AlbumSection({ albumId }) {
           <div className="section-heading">
             <div>
               <p className="eyebrow">ALBUM RECALL QUIZ</p>
-              <h2>회상 질문</h2>
+              <h2>회상 퀴즈</h2>
               <p className="muted">
-                사진은 숨기고, 앨범 전체의 AI 분석 단서와 촬영 정보를 이용한
-                객관식 질문을 표시합니다.
+                앨범 전체의 AI 분석 단서와 촬영 정보를 이용합니다. 문제에 따라
+                관련 사진을 보여주거나 사진 없이 기억을 떠올립니다.
               </p>
             </div>
           </div>
@@ -612,34 +613,44 @@ export default function AlbumSection({ albumId }) {
 
           {!quizSessions.length ? (
             <Empty>
-              아직 생성된 질문이 없습니다. 위의 ‘앨범 회상 질문 생성’을
-              눌러 시작하세요.
+              아직 생성된 퀴즈가 없습니다. 위의 ‘새 퀴즈 생성·시작’을 눌러주세요.
             </Empty>
           ) : (
-            quizSessions.map((session) => (
-              <section className="quiz-session-block" key={session.id}>
-                <h3>
-                  생성된 질문 <span className="count">{session.questions.length}</span>
-                </h3>
-                <ol className="quiz-question-list">
-                  {session.questions.map((question) => (
-                    <li key={question.id}>
-                      <p className="quiz-question-text">{question.content}</p>
-                      {question.options?.length ? (
-                        <ol className="question-option-list">
-                          {question.options.map((option, index) => (
-                            <li key={`${question.id}-${index}`}>
-                              <span>{index + 1}</span>
-                              {option}
-                            </li>
-                          ))}
-                        </ol>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              </section>
-            ))
+            <div className="quiz-session-list">
+              {quizSessions.map((session) => {
+                const questions = session.questions || [];
+                const compatible =
+                  questions.length > 0 &&
+                  questions.every((question) => question.options?.length === 4);
+                const photoQuestionCount = questions.filter(
+                  (question) => question.displayPhotoIds?.length,
+                ).length;
+
+                return (
+                  <article className="quiz-session-card" key={session.id}>
+                    <div>
+                      <p className="eyebrow">회상 퀴즈 #{session.id}</p>
+                      <h3>객관식 질문 {questions.length}개</h3>
+                      <p className="muted">
+                        사진 제시 {photoQuestionCount}개 · 사진 없이 회상 {questions.length - photoQuestionCount}개
+                      </p>
+                    </div>
+                    {compatible ? (
+                      <a
+                        className="button"
+                        href={`#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(session.id)}`}
+                      >
+                        퀴즈 시작
+                      </a>
+                    ) : (
+                      <span className="legacy-quiz-label">
+                        이전 형식 · 새 퀴즈를 생성해주세요
+                      </span>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
           )}
         </section>
       </section>

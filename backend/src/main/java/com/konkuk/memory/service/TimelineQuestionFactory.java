@@ -86,6 +86,7 @@ public class TimelineQuestionFactory {
                     List.copyOf(orderedOptions),
                     correctIndex,
                     selected.stream().map(TimedClue::photoId).toList(),
+                    selected.stream().map(TimedClue::photoId).sorted().toList(),
                     true,
                     reference
             ));
