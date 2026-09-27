@@ -12,7 +12,7 @@ class GeminiPhotoAnalysisClientTest {
     private final GeminiPhotoAnalysisClient client =
             new GeminiPhotoAnalysisClient(
                     "test-key",
-                    "gemini-2.5-flash-lite",
+                    "gemini-3.5-flash-lite",
                     objectMapper
             );
 
@@ -51,7 +51,7 @@ class GeminiPhotoAnalysisClientTest {
         assertThat(stored.path("provider").asText())
                 .isEqualTo("google-gemini");
         assertThat(stored.path("model").asText())
-                .isEqualTo("gemini-2.5-flash-lite");
+                .isEqualTo("gemini-3.5-flash-lite");
         assertThat(stored.has("analyzedAt")).isTrue();
         assertThat(stored.has("ignored")).isFalse();
     }

@@ -13,6 +13,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -40,17 +41,17 @@ public class GeminiPhotoAnalysisClient {
             """;
 
     private static final Map<String, Object> RESPONSE_SCHEMA = Map.of(
-            "type", "OBJECT",
+            "type", "object",
             "properties", Map.of(
-                    "summary", Map.of("type", "STRING"),
+                    "summary", Map.of("type", "string"),
                     "foods", Map.of(
-                            "type", "ARRAY",
+                            "type", "array",
                             "items", Map.of(
-                                    "type", "OBJECT",
+                                    "type", "object",
                                     "properties", Map.of(
-                                            "name", Map.of("type", "STRING"),
+                                            "name", Map.of("type", "string"),
                                             "confidence", Map.of(
-                                                    "type", "STRING",
+                                                    "type", "string",
                                                     "enum", List.of("HIGH", "MEDIUM", "LOW")
                                             )
                                     ),
@@ -58,9 +59,9 @@ public class GeminiPhotoAnalysisClient {
                             )
                     ),
                     "objects", stringArraySchema(),
-                    "scene", Map.of("type", "STRING"),
+                    "scene", Map.of("type", "string"),
                     "activities", stringArraySchema(),
-                    "peopleCount", Map.of("type", "INTEGER"),
+                    "peopleCount", Map.of("type", "integer"),
                     "visibleText", stringArraySchema(),
                     "questionClues", stringArraySchema(),
                     "uncertainties", stringArraySchema()
@@ -85,7 +86,7 @@ public class GeminiPhotoAnalysisClient {
 
     public GeminiPhotoAnalysisClient(
             @Value("${app.ai.gemini.api-key:}") String apiKey,
-            @Value("${app.ai.gemini.model:gemini-2.5-flash-lite}") String model,
+            @Value("${app.ai.gemini.model:gemini-3.5-flash-lite}") String model,
             ObjectMapper objectMapper
     ) {
         this.apiKey = apiKey.trim();
@@ -125,8 +126,12 @@ public class GeminiPhotoAnalysisClient {
                         )
                 )),
                 "generationConfig", Map.of(
-                        "responseMimeType", "application/json",
-                        "responseSchema", RESPONSE_SCHEMA,
+                        "responseFormat", Map.of(
+                                "text", Map.of(
+                                        "mimeType", "application/json",
+                                        "schema", RESPONSE_SCHEMA
+                                )
+                        ),
                         "temperature", 0.2
                 )
         );
@@ -157,6 +162,8 @@ public class GeminiPhotoAnalysisClient {
             return normalize(output);
         } catch (ApiException ex) {
             throw ex;
+        } catch (RestClientResponseException ex) {
+            throw upstreamFailure(ex.getStatusCode().value());
         } catch (RestClientException | JsonProcessingException ex) {
             throw analysisFailed();
         }
@@ -239,8 +246,8 @@ public class GeminiPhotoAnalysisClient {
 
     private static Map<String, Object> stringArraySchema() {
         return Map.of(
-                "type", "ARRAY",
-                "items", Map.of("type", "STRING")
+                "type", "array",
+                "items", Map.of("type", "string")
         );
     }
 
@@ -250,6 +257,32 @@ public class GeminiPhotoAnalysisClient {
             throw new IllegalArgumentException("Gemini model name is invalid.");
         }
         return value;
+    }
+
+    private static ApiException upstreamFailure(int status) {
+        return switch (status) {
+            case 400 -> new ApiException(
+                    HttpStatus.BAD_GATEWAY,
+                    "AI_REQUEST_REJECTED",
+                    "Gemini가 분석 요청 형식을 거절했습니다."
+            );
+            case 401, 403 -> new ApiException(
+                    HttpStatus.BAD_GATEWAY,
+                    "AI_API_KEY_REJECTED",
+                    "Gemini API 키 또는 프로젝트 권한을 확인해주세요."
+            );
+            case 404 -> new ApiException(
+                    HttpStatus.BAD_GATEWAY,
+                    "AI_MODEL_UNAVAILABLE",
+                    "현재 프로젝트에서 사용할 수 없는 Gemini 모델입니다."
+            );
+            case 429 -> new ApiException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "AI_QUOTA_EXCEEDED",
+                    "Gemini 무료 사용량을 초과했습니다. 잠시 후 다시 시도해주세요."
+            );
+            default -> analysisFailed();
+        };
     }
 
     private static ApiException analysisFailed() {
