@@ -1,80 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { Empty } from "./UI";
+import PhotoImage from "./PhotoImage";
 
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("ko-KR");
-}
-
-function PhotoThumbnail({ albumId, photo }) {
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageError, setImageError] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let objectUrl = "";
-
-    async function loadImage() {
-      try {
-        setImageError(false);
-
-        const blob = await api.photoImage(
-          albumId,
-          photo.id,
-          controller.signal,
-        );
-
-        objectUrl = URL.createObjectURL(blob);
-        setImageUrl(objectUrl);
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setImageError(true);
-        }
-      }
-    }
-
-    loadImage();
-
-    return () => {
-      controller.abort();
-
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [albumId, photo.id]);
-
-  if (imageError) {
-    return (
-      <div className="file-mark" aria-hidden="true">
-        ▧
-      </div>
-    );
-  }
-
-  if (!imageUrl) {
-    return (
-      <div className="file-mark" aria-hidden="true">
-        불러오는 중...
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={imageUrl}
-      alt={photo.originalFilename}
-      style={{
-        width: "100%",
-        height: "180px",
-        objectFit: "cover",
-        borderRadius: "12px",
-        display: "block",
-        marginBottom: "12px",
-      }}
-    />
-  );
 }
 
 export default function AlbumSection() {
@@ -321,37 +252,43 @@ export default function AlbumSection() {
                 className="photo-item"
                 key={photo.id}
               >
-                <PhotoThumbnail
-                  albumId={selectedAlbum.id}
-                  photo={photo}
-                />
+                <a
+                  className="photo-open"
+                  href={`#/albums/${selectedAlbum.id}/photos/${photo.id}`}
+                  aria-label={`${photo.originalFilename} 상세 보기`}
+                >
+                  <PhotoImage
+                    albumId={selectedAlbum.id}
+                    photo={photo}
+                  />
 
-                <h3>{photo.originalFilename}</h3>
+                  <h3>{photo.originalFilename}</h3>
 
-                <p className="muted">
-                  {photo.contentType} ·{" "}
-                  {(photo.sizeBytes / 1024).toFixed(1)} KB
-                </p>
+                  <p className="muted">
+                    {photo.contentType} ·{" "}
+                    {(photo.sizeBytes / 1024).toFixed(1)} KB
+                  </p>
 
-                <dl>
-                  <div>
-                    <dt>촬영일</dt>
-                    <dd>
-                      {photo.confirmedTakenOn ||
-                        photo.metadataTakenAt ||
-                        "미등록"}
-                    </dd>
-                  </div>
+                  <dl>
+                    <div>
+                      <dt>촬영일</dt>
+                      <dd>
+                        {photo.confirmedTakenOn ||
+                          photo.metadataTakenAt ||
+                          "미등록"}
+                      </dd>
+                    </div>
 
-                  <div>
-                    <dt>장소</dt>
-                    <dd>
-                      {photo.confirmedLocation ||
-                        photo.metadataLocation ||
-                        "미등록"}
-                    </dd>
-                  </div>
-                </dl>
+                    <div>
+                      <dt>장소</dt>
+                      <dd>
+                        {photo.confirmedLocation ||
+                          photo.metadataLocation ||
+                          "미등록"}
+                      </dd>
+                    </div>
+                  </dl>
+                </a>
 
                 <button
                   type="button"

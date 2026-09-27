@@ -9,6 +9,7 @@ import java.util.*;
 
 public interface PhotoRepository extends JpaRepository<Photo, Long> {
     Optional<Photo> findByIdAndUser_Id(Long photoId, Long userId);
+    Optional<Photo> findByIdAndAlbum_IdAndUser_Id(Long photoId, Long albumId, Long userId);
     Page<Photo> findAllByUser_Id(Long userId, Pageable pageable);
     List<Photo> findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(Long albumId, Long userId);
 }

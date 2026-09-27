@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class DatabaseIntegrationTest {
     @Autowired UserRepository users;
+    @Autowired AlbumRepository albums;
     @Autowired PhotoRepository photos;
     @Autowired TrainingSessionRepository sessions;
     @Autowired QuestionRepository questions;
@@ -25,7 +26,10 @@ class DatabaseIntegrationTest {
     @Autowired JdbcTemplate jdbc;
 
     private User owner(String email) { return users.saveAndFlush(new User(email, "test-fixture-hash", "회원")); }
-    private Photo photo(User user) { return photos.saveAndFlush(new Photo(user, "private/" + user.getEmail(), "photo.jpg", "image/jpeg", 1024)); }
+    private Photo photo(User user) {
+        Album album = albums.saveAndFlush(new Album(user, "테스트 앨범"));
+        return photos.saveAndFlush(new Photo(user, album, "private/" + user.getEmail(), "photo.jpg", "image/jpeg", 1024));
+    }
     private Question question(TrainingSession session) {
         return questions.saveAndFlush(new Question(session, 1, "어떤 기억이 떠오르나요?", Question.Type.EXPERIENCE,
                 "[{\"source\":\"AI_INFERENCE\",\"clue\":\"바다\"}]", false, null, "test-v1"));

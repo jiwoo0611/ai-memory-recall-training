@@ -3,6 +3,7 @@ import { api, session, clearSession, expireSession } from "./api/client";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MyPage from "./pages/MyPage";
+import PhotoDetailPage from "./pages/PhotoDetailPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
 export default function App() {
@@ -11,6 +12,9 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [logoutError, setLogoutError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const photoRoute = page.match(
+    /^\/albums\/([^/]+)\/photos\/([^/]+)$/,
+  );
   useEffect(() => {
     const navigate = () => {
       setPage(route());
@@ -46,7 +50,7 @@ export default function App() {
     };
   }, [auth]);
   useEffect(() => {
-    if (page === "/mypage" && !auth) {
+    if ((page === "/mypage" || photoRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
       location.hash = "/login";
     }
@@ -100,6 +104,15 @@ export default function App() {
     ) : (
       <p role="status">로그인 화면으로 이동합니다…</p>
     );
+  else if (photoRoute)
+    content = auth ? (
+      <PhotoDetailPage
+        albumId={decodeURIComponent(photoRoute[1])}
+        photoId={decodeURIComponent(photoRoute[2])}
+      />
+    ) : (
+      <p role="status">로그인 화면으로 이동합니다…</p>
+    );
   else
     content = (
       <section className="card">
@@ -134,7 +147,7 @@ export default function App() {
             <>
               <a
                 href="#/mypage"
-                aria-current={page === "/mypage" ? "page" : undefined}
+                aria-current={page === "/mypage" || photoRoute ? "page" : undefined}
               >
                 마이페이지
               </a>

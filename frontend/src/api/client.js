@@ -351,6 +351,14 @@ export const api = {
       },
     ),
 
+  photo: (albumId, photoId, signal) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}/photos/${encodeURIComponent(photoId)}`,
+      {
+        signal,
+      },
+    ),
+
   uploadPhotos,
   photoImage,
 

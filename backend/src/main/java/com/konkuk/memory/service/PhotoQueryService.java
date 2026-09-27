@@ -52,25 +52,49 @@ public class PhotoQueryService {
 
     public PhotoResponse getPhoto(
             Long userId,
+            Long albumId,
             Long photoId
     ) {
 
-        Photo photo = getPhotoEntity(userId, photoId);
+        Photo photo = getPhotoEntity(userId, albumId, photoId);
 
         return PhotoResponse.from(photo);
     }
 
-    public Photo getPhotoEntity(
+    public PhotoFile getPhotoFile(
             Long userId,
+            Long albumId,
+            Long photoId
+    ) {
+        Photo photo = getPhotoEntity(userId, albumId, photoId);
+
+        return new PhotoFile(
+                photo.getStorageKey(),
+                photo.getContentType()
+        );
+    }
+
+    private Photo getPhotoEntity(
+            Long userId,
+            Long albumId,
             Long photoId
     ) {
 
         return photoRepository
-                .findByIdAndUser_Id(photoId, userId)
+                .findByIdAndAlbum_IdAndUser_Id(
+                        photoId,
+                        albumId,
+                        userId
+                )
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "PHOTO_NOT_FOUND",
                         "사진을 찾을 수 없습니다."
                 ));
     }
+
+    public record PhotoFile(
+            String storageKey,
+            String contentType
+    ) {}
 }

@@ -2,7 +2,6 @@ package com.konkuk.memory.controller;
 
 import com.konkuk.memory.dto.PhotoConfirmRequest;
 import com.konkuk.memory.dto.PhotoResponse;
-import com.konkuk.memory.entity.Photo;
 import com.konkuk.memory.exception.ApiException;
 import com.konkuk.memory.service.FileStorageService;
 import com.konkuk.memory.service.PhotoDeleteService;
@@ -77,12 +76,14 @@ public class PhotoController {
     @GetMapping("/{photoId}")
     public PhotoResponse getPhoto(
             @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long albumId,
             @PathVariable Long photoId
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
 
         return photoQueryService.getPhoto(
                 userId,
+                albumId,
                 photoId
         );
     }
@@ -95,23 +96,17 @@ public class PhotoController {
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
 
-        Photo photo = photoQueryService.getPhotoEntity(
-                userId,
-                photoId
-        );
-
-        if (!photo.getAlbum().getId().equals(albumId)) {
-            throw new ApiException(
-                    HttpStatus.NOT_FOUND,
-                    "PHOTO_NOT_FOUND",
-                    "사진을 찾을 수 없습니다."
-            );
-        }
+        PhotoQueryService.PhotoFile photo =
+                photoQueryService.getPhotoFile(
+                        userId,
+                        albumId,
+                        photoId
+                );
 
         try {
             byte[] imageBytes =
                     fileStorageService.load(
-                            photo.getStorageKey()
+                            photo.storageKey()
                     );
 
             MediaType mediaType;
@@ -119,7 +114,7 @@ public class PhotoController {
             try {
                 mediaType =
                         MediaType.parseMediaType(
-                                photo.getContentType()
+                                photo.contentType()
                         );
             } catch (Exception e) {
                 mediaType =

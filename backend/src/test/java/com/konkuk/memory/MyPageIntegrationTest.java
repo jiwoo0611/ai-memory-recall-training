@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.konkuk.memory.entity.*;
 import com.konkuk.memory.repository.*;
 import com.konkuk.memory.security.TokenService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.*;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -28,6 +33,7 @@ class MyPageIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired UserRepository users;
+    @Autowired AlbumRepository albums;
     @Autowired PhotoRepository photos;
     @Autowired TrainingSessionRepository sessions;
     @Autowired QuestionRepository questions;
@@ -36,11 +42,12 @@ class MyPageIntegrationTest {
     @Autowired TokenService tokens;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
-    private Long userId, photoId, secondPhotoId, sessionId, emptySessionId, otherSessionId;
-    private String token, otherToken, email;
+    private Long userId, ownerAlbumId, otherAlbumId, photoId, secondPhotoId, sessionId, emptySessionId, otherSessionId;
+    private String token, otherToken, email, storageKey;
+    private Path imagePath;
 
     @BeforeEach
-    void fixture() {
+    void fixture() throws IOException {
         // Fixtures commit before requests: lazy loading must work inside the service transaction,
         // not accidentally via an enclosing test transaction. Only the test-profile H2 is used.
         assertThat(jdbc.queryForObject("SELECT H2VERSION()", String.class)).isNotBlank();
@@ -52,9 +59,14 @@ class MyPageIntegrationTest {
             userId = owner.getId();
             token = tokens.issue(owner.getId()).accessToken();
             otherToken = tokens.issue(other.getId()).accessToken();
-            Photo photo = photos.save(new Photo(owner, "private/" + suffix + "/1", "own.jpg", "image/jpeg", 100));
-            Photo second = photos.save(new Photo(owner, "private/" + suffix + "/2", "second.jpg", "image/jpeg", 200));
-            Photo foreignPhoto = photos.save(new Photo(other, "private/" + suffix + "/other", "other.jpg", "image/jpeg", 300));
+            Album ownerAlbum = albums.save(new Album(owner, "본인 앨범"));
+            Album otherAlbum = albums.save(new Album(other, "다른 앨범"));
+            ownerAlbumId = ownerAlbum.getId();
+            otherAlbumId = otherAlbum.getId();
+            storageKey = "test/" + suffix + "/own.jpg";
+            Photo photo = photos.save(new Photo(owner, ownerAlbum, storageKey, "own.jpg", "image/jpeg", 100));
+            Photo second = photos.save(new Photo(owner, ownerAlbum, "private/" + suffix + "/2", "second.jpg", "image/jpeg", 200));
+            Photo foreignPhoto = photos.save(new Photo(other, otherAlbum, "private/" + suffix + "/other", "other.jpg", "image/jpeg", 300));
             photoId = photo.getId();
             secondPhotoId = second.getId();
             TrainingSession full = sessions.save(new TrainingSession(photo));
@@ -78,6 +90,16 @@ class MyPageIntegrationTest {
         // Fixed fixture timestamps verify the id tie-breaker without sleeps.
         jdbc.update("UPDATE photos SET created_at = '2026-01-01 00:00:00' WHERE user_id = ?", userId);
         jdbc.update("UPDATE training_sessions SET started_at = '2026-01-01 00:00:00' WHERE id IN (?, ?)", sessionId, emptySessionId);
+        imagePath = Paths.get("uploads").toAbsolutePath().normalize().resolve(storageKey);
+        Files.createDirectories(imagePath.getParent());
+        Files.write(imagePath, new byte[]{1, 2, 3, 4});
+    }
+
+    @AfterEach
+    void deleteFixtureImage() throws IOException {
+        if (imagePath == null) return;
+        Files.deleteIfExists(imagePath);
+        Files.deleteIfExists(imagePath.getParent());
     }
 
     private Question question(TrainingSession session, int order) {
@@ -91,7 +113,9 @@ class MyPageIntegrationTest {
 
     private List<String> paths() {
         return List.of("/api/users/me", "/api/users/me/photos", "/api/users/me/training-sessions",
-                "/api/users/me/training-sessions/" + sessionId);
+                "/api/users/me/training-sessions/" + sessionId,
+                "/api/albums/" + ownerAlbumId + "/photos/" + photoId,
+                "/api/albums/" + ownerAlbumId + "/photos/" + photoId + "/image");
     }
 
     @Test void allEndpointsRequireJwt() throws Exception {
@@ -101,6 +125,25 @@ class MyPageIntegrationTest {
     @Test void allEndpointsRejectInvalidJwt() throws Exception {
         for (String path : paths()) mvc.perform(get(path).header("Authorization", "Bearer invalid.jwt.value"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test void photoDetailAndImageAreAlbumScopedOutsideFixtureTransaction() throws Exception {
+        ownGet("/api/albums/" + ownerAlbumId + "/photos/" + photoId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("id").value(photoId))
+                .andExpect(jsonPath("albumId").value(ownerAlbumId))
+                .andExpect(jsonPath("originalFilename").value("own.jpg"));
+
+        ownGet("/api/albums/" + ownerAlbumId + "/photos/" + photoId + "/image")
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/jpeg"))
+                .andExpect(content().bytes(new byte[]{1, 2, 3, 4}));
+
+        ownGet("/api/albums/" + otherAlbumId + "/photos/" + photoId)
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/albums/" + ownerAlbumId + "/photos/" + photoId)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
     }
 
     @Test void profileIncludesDatesAndUsesTokenIdentity() throws Exception {
