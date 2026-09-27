@@ -1,6 +1,7 @@
 package com.konkuk.memory.controller;
 
 import com.konkuk.memory.dto.PhotoConfirmRequest;
+import com.konkuk.memory.dto.PhotoDeleteRequest;
 import com.konkuk.memory.dto.PhotoResponse;
 import com.konkuk.memory.exception.ApiException;
 import com.konkuk.memory.service.FileStorageService;
@@ -139,6 +140,7 @@ public class PhotoController {
         }
     }
 
+    // 사진 1장 삭제
     @DeleteMapping("/{photoId}")
     public ResponseEntity<Void> deletePhoto(
             @AuthenticationPrincipal Jwt jwt,
@@ -151,6 +153,24 @@ public class PhotoController {
                 userId,
                 albumId,
                 photoId
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
+    // 선택한 사진 여러 장 삭제
+    @DeleteMapping
+    public ResponseEntity<Void> deleteSelectedPhotos(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long albumId,
+            @RequestBody PhotoDeleteRequest request
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+
+        photoDeleteService.deleteSelected(
+                userId,
+                albumId,
+                request.getPhotoIds()
         );
 
         return ResponseEntity.noContent().build();
