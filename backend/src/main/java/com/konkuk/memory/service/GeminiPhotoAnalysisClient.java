@@ -126,17 +126,8 @@ public class GeminiPhotoAnalysisClient {
                         )
                 )),
                 "generationConfig", Map.of(
-<<<<<<< HEAD
-                        "responseFormat", Map.of(
-                                "text", Map.of(
-                                        "mimeType", "application/json",
-                                        "schema", RESPONSE_SCHEMA
-                                )
-                        ),
-=======
                         "responseMimeType", "application/json",
                         "responseJsonSchema", RESPONSE_SCHEMA,
->>>>>>> myfork/backend-dongmin
                         "temperature", 0.2
                 )
         );
@@ -150,39 +141,16 @@ public class GeminiPhotoAnalysisClient {
                     .retrieve()
                     .body(JsonNode.class);
 
-<<<<<<< HEAD
-            String output = response == null
-                    ? null
-                    : response.path("candidates")
-                    .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text")
-                    .textValue();
-
-            if (output == null || output.isBlank()) {
-                throw analysisFailed();
-=======
             String output = extractOutput(response);
 
             if (output == null || output.isBlank()) {
                 throw invalidResponse();
->>>>>>> myfork/backend-dongmin
             }
 
             return normalize(output);
         } catch (ApiException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
-<<<<<<< HEAD
-            throw upstreamFailure(ex.getStatusCode().value());
-        } catch (RestClientException | JsonProcessingException ex) {
-            throw analysisFailed();
-        }
-    }
-
-=======
             throw upstreamFailure(
                     ex.getStatusCode().value(),
                     extractUpstreamMessage(ex.getResponseBodyAsString())
@@ -217,7 +185,6 @@ public class GeminiPhotoAnalysisClient {
         return output;
     }
 
->>>>>>> myfork/backend-dongmin
     String normalize(String output) throws JsonProcessingException {
         JsonNode source = objectMapper.readTree(output);
 
@@ -311,9 +278,6 @@ public class GeminiPhotoAnalysisClient {
         return value;
     }
 
-<<<<<<< HEAD
-    private static ApiException upstreamFailure(int status) {
-=======
     private String extractUpstreamMessage(String responseBody) {
         try {
             String message = objectMapper.readTree(responseBody)
@@ -348,16 +312,11 @@ public class GeminiPhotoAnalysisClient {
 
     private static ApiException upstreamFailure(int status, String detail) {
         String diagnostic = detail.isBlank() ? "" : " (" + detail + ")";
->>>>>>> myfork/backend-dongmin
         return switch (status) {
             case 400 -> new ApiException(
                     HttpStatus.BAD_GATEWAY,
                     "AI_REQUEST_REJECTED",
-<<<<<<< HEAD
-                    "Gemini가 분석 요청 형식을 거절했습니다."
-=======
                     "Gemini가 분석 요청 형식을 거절했습니다." + diagnostic
->>>>>>> myfork/backend-dongmin
             );
             case 401, 403 -> new ApiException(
                     HttpStatus.BAD_GATEWAY,
