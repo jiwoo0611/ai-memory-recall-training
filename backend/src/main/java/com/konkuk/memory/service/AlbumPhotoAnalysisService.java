@@ -14,19 +14,16 @@ public class AlbumPhotoAnalysisService {
 
     private final AlbumRepository albumRepository;
     private final PhotoRepository photoRepository;
-    private final PhotoAnalysisService photoAnalysisService;
 
     public AlbumPhotoAnalysisService(
             AlbumRepository albumRepository,
-            PhotoRepository photoRepository,
-            PhotoAnalysisService photoAnalysisService
+            PhotoRepository photoRepository
     ) {
         this.albumRepository = albumRepository;
         this.photoRepository = photoRepository;
-        this.photoAnalysisService = photoAnalysisService;
     }
 
-    public void analyzeMissing(Long userId, Long albumId) {
+    public void ensureComplete(Long userId, Long albumId) {
         albumRepository.findByIdAndUser_Id(albumId, userId)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
@@ -44,10 +41,14 @@ public class AlbumPhotoAnalysisService {
             );
         }
 
-        for (Photo photo : photos) {
-            if (photo.getAiClues() == null || photo.getAiClues().isBlank()) {
-                photoAnalysisService.analyze(userId, albumId, photo.getId());
-            }
+        boolean hasMissingAnalysis = photos.stream()
+                .anyMatch(photo -> photo.getAiClues() == null || photo.getAiClues().isBlank());
+        if (hasMissingAnalysis) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "QUESTION_PHOTO_ANALYSIS_REQUIRED",
+                    "사진 AI 분석을 모두 완료한 뒤 질문을 생성해주세요."
+            );
         }
     }
 }

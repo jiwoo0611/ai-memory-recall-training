@@ -139,7 +139,7 @@ public class GeminiQuestionGenerationClient {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(150));
+        requestFactory.setReadTimeout(Duration.ofSeconds(85));
         this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com")
                 .requestFactory(requestFactory)

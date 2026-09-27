@@ -254,6 +254,27 @@ export default function AlbumSection({ albumId }) {
       setQuestionGenerationError("");
       setQuestionGenerationNotice("");
 
+      let updatedPhotos = albumPhotos;
+      const photosToAnalyze = updatedPhotos.filter(
+        (photo) => !photo.aiClues?.trim(),
+      );
+
+      for (let index = 0; index < photosToAnalyze.length; index += 1) {
+        const photo = photosToAnalyze[index];
+        setQuestionGenerationNotice(
+          `사진 AI 분석 중 (${index + 1}/${photosToAnalyze.length})…`,
+        );
+        const analyzedPhoto = await api.analyzePhoto(
+          selectedAlbum.id,
+          photo.id,
+        );
+        updatedPhotos = updatedPhotos.map((item) =>
+          item.id === analyzedPhoto.id ? analyzedPhoto : item,
+        );
+        setAlbumPhotos(updatedPhotos);
+      }
+
+      setQuestionGenerationNotice("객관식 질문 생성 중…");
       const generatedSession = await api.generateAlbumQuestions(
         selectedAlbum.id,
       );
@@ -268,6 +289,7 @@ export default function AlbumSection({ albumId }) {
       );
       location.hash = `#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(generatedSession.id)}`;
     } catch (err) {
+      setQuestionGenerationNotice("");
       setQuestionGenerationError(
         err.message || "앨범 질문 생성에 실패했습니다.",
       );
@@ -275,7 +297,6 @@ export default function AlbumSection({ albumId }) {
       setGeneratingQuestions(false);
     }
   };
-
   const handleDeleteAlbum = async (event, album) => {
     event.stopPropagation();
 
@@ -345,7 +366,7 @@ export default function AlbumSection({ albumId }) {
                 disabled={generatingQuestions || deletingSelected}
               >
                 {generatingQuestions
-                  ? "사진 분석·질문 생성 중…"
+                  ? questionGenerationNotice || "퀴즈 준비 중…"
                   : "새 퀴즈 생성·시작"}
               </button>
             )}

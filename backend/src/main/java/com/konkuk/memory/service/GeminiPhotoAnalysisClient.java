@@ -102,7 +102,7 @@ public class GeminiPhotoAnalysisClient {
                 .build();
         JdkClientHttpRequestFactory requestFactory =
                 new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(150));
+        requestFactory.setReadTimeout(Duration.ofSeconds(85));
 
         this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com")

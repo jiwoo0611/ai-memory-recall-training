@@ -34,7 +34,7 @@ public class AlbumQuestionGenerationService {
     }
 
     public TrainingSessionDetailResponse generate(Long userId, Long albumId) {
-        albumPhotoAnalysisService.analyzeMissing(userId, albumId);
+        albumPhotoAnalysisService.ensureComplete(userId, albumId);
         AlbumQuestionContextService.AlbumQuestionContext context = contextService.build(userId, albumId);
         Long sessionId = persistenceService.start(userId, context.albumId(), context.anchorPhotoId());
 
