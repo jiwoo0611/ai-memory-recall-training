@@ -6,6 +6,8 @@ import MyPage from "./pages/MyPage";
 import PhotoDetailPage from "./pages/PhotoDetailPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
+// Authentication redirects replace the current entry; ordinary links keep history.
+const redirect = (path) => location.replace(`#${path}`);
 export default function App() {
   const [page, setPage] = useState(route);
   const [auth, setAuth] = useState(session);
@@ -26,7 +28,7 @@ export default function App() {
       setNotice(
         "로그인이 만료되었거나 인증이 해제되었습니다. 다시 로그인해주세요.",
       );
-      location.hash = "/login";
+      redirect("/login");
     };
     window.addEventListener("hashchange", navigate);
     window.addEventListener("auth-change", sync);
@@ -52,7 +54,9 @@ export default function App() {
   useEffect(() => {
     if ((page === "/mypage" || photoRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
-      location.hash = "/login";
+      redirect("/login");
+    } else if (auth && (page === "/login" || page === "/signup")) {
+      redirect("/mypage");
     }
   }, [page, auth]);
   async function logout() {
@@ -62,7 +66,7 @@ export default function App() {
       await api.logout();
       clearSession();
       setNotice("안전하게 로그아웃되었습니다.");
-      location.hash = "/login";
+      redirect("/login");
     } catch (e) {
       if (e.status !== 401)
         setLogoutError(
@@ -83,7 +87,7 @@ export default function App() {
         signup
         onSuccess={(message) => {
           setNotice(message);
-          location.hash = "/login";
+          redirect("/login");
         }}
       />
     );
@@ -94,7 +98,7 @@ export default function App() {
         notice={notice}
         onSuccess={() => {
           setNotice("");
-          location.hash = "/mypage";
+          redirect("/mypage");
         }}
       />
     );
