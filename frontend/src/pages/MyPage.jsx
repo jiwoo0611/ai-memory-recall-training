@@ -220,7 +220,7 @@ function SessionDetail({ id, onClose }) {
   );
 }
 
-export default function MyPage() {
+export default function MyPage({ albumId }) {
   const [trainingPage, setTrainingPage] =
     useState(0);
 
@@ -352,7 +352,7 @@ export default function MyPage() {
         <div className="main-column">
 
           {/* 앨범 + 사진 관리 */}
-          <AlbumSection />
+          <AlbumSection key={albumId ?? "albums"} albumId={albumId} />
 
           {/* 회상 훈련 기록 */}
           <section className="card">

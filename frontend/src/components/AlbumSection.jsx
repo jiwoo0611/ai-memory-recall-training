@@ -8,7 +8,7 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("ko-KR");
 }
 
-export default function AlbumSection() {
+export default function AlbumSection({ albumId }) {
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,25 +27,36 @@ export default function AlbumSection() {
 
   const fileInputRef = useRef(null);
 
-  const loadAlbums = async () => {
-    try {
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
       setLoading(true);
       setError("");
-
-      const data = await api.albums();
-      setAlbums(data);
-    } catch (err) {
-      setError(
-        err.message || "앨범을 불러오지 못했습니다.",
-      );
-    } finally {
-      setLoading(false);
+      try {
+        if (albumId) {
+          const [album, photos] = await Promise.all([
+            api.album(albumId, controller.signal),
+            api.albumPhotos(albumId, controller.signal),
+          ]);
+          if (!controller.signal.aborted) {
+            setSelectedAlbum(album);
+            setAlbumPhotos(photos);
+          }
+        } else {
+          const albums = await api.albums(controller.signal);
+          if (!controller.signal.aborted) setAlbums(albums);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err.message || "앨범을 불러오지 못했습니다.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    loadAlbums();
-  }, []);
+    load();
+    return () => controller.abort();
+  }, [albumId]);
 
   const handleCreateAlbum = async (event) => {
     event.preventDefault();
@@ -80,23 +91,6 @@ export default function AlbumSection() {
       );
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleOpenAlbum = async (album) => {
-    try {
-      setSelectedAlbum(album);
-      setAlbumPhotos([]);
-      setUploadError("");
-      setError("");
-
-      const photos = await api.albumPhotos(album.id);
-      setAlbumPhotos(photos);
-    } catch (err) {
-      setError(
-        err.message ||
-          "앨범의 사진을 불러오지 못했습니다.",
-      );
     }
   };
 
@@ -192,21 +186,27 @@ export default function AlbumSection() {
     }
   };
 
-  if (selectedAlbum) {
+  if (albumId && (loading || error)) {
+    return (
+      <section className="card">
+        <a className="back-link" href="#/mypage">← 앨범 목록</a>
+        {loading ? (
+          <p className="loading" role="status">앨범을 불러오는 중입니다…</p>
+        ) : (
+          <p className="error" role="alert">{error}</p>
+        )}
+      </section>
+    );
+  }
+
+  if (albumId && selectedAlbum) {
     return (
       <section className="card">
         <div className="section-heading">
           <div>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAlbum(null);
-                setAlbumPhotos([]);
-                setUploadError("");
-              }}
-            >
+            <a className="back-link" href="#/mypage">
               ← 앨범 목록
-            </button>
+            </a>
 
             <h2>{selectedAlbum.title}</h2>
           </div>
@@ -377,26 +377,28 @@ export default function AlbumSection() {
             <article
               className="photo-item"
               key={album.id}
-              onClick={() =>
-                handleOpenAlbum(album)
-              }
               style={{
                 textAlign: "left",
-                cursor: "pointer",
               }}
             >
-              <div
-                className="file-mark"
-                aria-hidden="true"
+              <a
+                className="photo-open"
+                href={`#/albums/${encodeURIComponent(album.id)}`}
+                aria-label={`${album.title} 앨범 열기`}
               >
-                📁
-              </div>
+                <div
+                  className="file-mark"
+                  aria-hidden="true"
+                >
+                  📁
+                </div>
 
-              <h3>{album.title}</h3>
+                <h3>{album.title}</h3>
 
-              <p className="muted">
-                생성일 {formatDate(album.createdAt)}
-              </p>
+                <p className="muted">
+                  생성일 {formatDate(album.createdAt)}
+                </p>
+              </a>
 
               <button
                 type="button"
