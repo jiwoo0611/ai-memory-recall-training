@@ -59,7 +59,7 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(2).referenceInformation())
                 .isEqualTo("EXIF 촬영일: 2026-05-09");
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-v1");
+                .isEqualTo("gemini-3.5-flash-lite:album-v2");
     }
 
     @Test
