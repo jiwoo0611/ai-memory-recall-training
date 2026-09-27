@@ -264,7 +264,7 @@ export default function AlbumSection({ albumId }) {
       for (let index = 0; index < photosToAnalyze.length; index += 1) {
         const photo = photosToAnalyze[index];
         setQuestionGenerationNotice(
-          `사진 AI 분석 중 (${alreadyAnalyzedCount + index + 1}/${updatedPhotos.length})…`,
+          `전체 ${updatedPhotos.length}장 중 ${alreadyAnalyzedCount + index + 1}번째 사진 AI 분석 중…`,
         );
         const analyzedPhoto = await api.analyzePhoto(
           selectedAlbum.id,
