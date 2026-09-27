@@ -65,7 +65,7 @@ public class GeminiQuestionGenerationClient {
             - options는 정확히 4개이며 같은 범주의 자연스러운 보기여야 합니다.
             - correctOptionIndex는 0부터 시작하는 정답 보기 위치입니다.
             - 오답은 앨범 근거에 정답처럼 등장하지 않아야 합니다.
-            - evidencePhotoIds에는 실제로 사용한 photoId만 넣으세요.
+            - evidencePhotoIds에는 실제로 사용한 photoId만 최대 4개 넣으세요.
             - displayPhotoIds는 evidencePhotoIds의 부분집합이며 최대 4개입니다.
             - referenceInformation에는 정답을 뒷받침하는 근거를 짧게 적으세요.
             - 질문끼리 표현이나 정답이 반복되면 안 됩니다.
@@ -107,6 +107,7 @@ public class GeminiQuestionGenerationClient {
                                             ),
                                             "evidencePhotoIds", Map.of(
                                                     "type", "array",
+                                                    "maxItems", 4,
                                                     "items", Map.of("type", "integer")
                                             ),
                                             "displayPhotoIds", Map.of(
@@ -309,6 +310,7 @@ public class GeminiQuestionGenerationClient {
                     || correctOptionIndex >= options.size()
                     || !uniqueAnswers.add(options.get(correctOptionIndex))
                     || evidencePhotoIds.isEmpty()
+                    || evidencePhotoIds.size() > 4
                     || !displayIds.isArray()
                     || displayPhotoIds.size() != displayIds.size()
                     || displayPhotoIds.size() > 4

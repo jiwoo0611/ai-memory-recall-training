@@ -19,7 +19,7 @@ public class Question extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30, columnDefinition = "VARCHAR(30)")
     private Type type;
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
     private String evidenceSnapshot;
     @Column(nullable = false)
     private boolean verifiable;

@@ -1,6 +1,7 @@
 package com.konkuk.memory.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.konkuk.memory.entity.Photo;
@@ -14,7 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class QuestionGenerationPersistenceService {
@@ -93,11 +96,25 @@ public class QuestionGenerationPersistenceService {
                 ));
     }
 
-    private String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds, List<Long> displayPhotoIds, Question.Difficulty difficulty) {
+    String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds, List<Long> displayPhotoIds, Question.Difficulty difficulty) {
         try {
+            JsonNode albumEvidence = objectMapper.readTree(albumEvidenceJson);
+            Set<Long> referencedPhotoIds = new LinkedHashSet<>(evidencePhotoIds);
+
             ObjectNode snapshot = objectMapper.createObjectNode();
             snapshot.put("scope", "ALBUM");
-            snapshot.set("albumEvidence", objectMapper.readTree(albumEvidenceJson));
+            if (albumEvidence.path("albumId").canConvertToLong()) {
+                snapshot.put("albumId", albumEvidence.path("albumId").asLong());
+            }
+            var evidencePhotos = snapshot.putArray("photos");
+            JsonNode albumPhotos = albumEvidence.path("photos");
+            if (albumPhotos.isArray()) {
+                albumPhotos.forEach(photo -> {
+                    if (referencedPhotoIds.contains(photo.path("photoId").asLong())) {
+                        evidencePhotos.add(photo.deepCopy());
+                    }
+                });
+            }
             snapshot.set("evidencePhotoIds", objectMapper.valueToTree(evidencePhotoIds));
             snapshot.set("displayPhotoIds", objectMapper.valueToTree(displayPhotoIds));
             snapshot.put("difficulty", difficulty.name());

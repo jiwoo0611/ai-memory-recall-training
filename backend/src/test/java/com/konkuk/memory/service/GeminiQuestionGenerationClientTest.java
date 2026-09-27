@@ -83,6 +83,19 @@ class GeminiQuestionGenerationClientTest {
                 .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
     }
 
+    @Test
+    void rejectsQuestionWithMoreThanFourEvidencePhotos() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ObjectNode first = (ObjectNode) root.path("questions").path(0);
+        first.set("evidencePhotoIds", objectMapper.valueToTree(
+                new Long[]{11L, 12L, 13L, 14L, 15L}
+        ));
+
+        assertThatThrownBy(() -> client.normalize(
+                root.toString(),
+                Set.of(11L, 12L, 13L, 14L, 15L)
+        )).isInstanceOf(ApiException.class);
+    }
     private String validOutput(int count) throws Exception {
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode questions = root.putArray("questions");
