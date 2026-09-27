@@ -145,18 +145,10 @@ public class GeminiPhotoAnalysisClient {
                     .retrieve()
                     .body(JsonNode.class);
 
-            String output = response == null
-                    ? null
-                    : response.path("candidates")
-                    .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text")
-                    .textValue();
+            String output = extractOutput(response);
 
             if (output == null || output.isBlank()) {
-                throw analysisFailed();
+                throw invalidResponse();
             }
 
             return normalize(output);
@@ -164,9 +156,34 @@ public class GeminiPhotoAnalysisClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             throw upstreamFailure(ex.getStatusCode().value());
-        } catch (RestClientException | JsonProcessingException ex) {
-            throw analysisFailed();
+        } catch (JsonProcessingException ex) {
+            throw invalidResponse();
+        } catch (RestClientException ex) {
+            throw connectionFailed();
         }
+    }
+
+    private static String extractOutput(JsonNode response) {
+        if (response == null) {
+            return null;
+        }
+
+        JsonNode parts = response.path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts");
+        String output = null;
+
+        if (parts.isArray()) {
+            for (JsonNode part : parts) {
+                String text = part.path("text").textValue();
+                if (text != null && !text.isBlank()) {
+                    output = text;
+                }
+            }
+        }
+
+        return output;
     }
 
     String normalize(String output) throws JsonProcessingException {
@@ -260,6 +277,22 @@ public class GeminiPhotoAnalysisClient {
             return "gemini-3.5-flash-lite";
         }
         return value;
+    }
+
+    private static ApiException invalidResponse() {
+        return new ApiException(
+                HttpStatus.BAD_GATEWAY,
+                "AI_RESPONSE_INVALID",
+                "Gemini 응답을 사진 분석 결과로 처리하지 못했습니다."
+        );
+    }
+
+    private static ApiException connectionFailed() {
+        return new ApiException(
+                HttpStatus.BAD_GATEWAY,
+                "AI_CONNECTION_FAILED",
+                "Gemini 서버에 연결하지 못했습니다."
+        );
     }
 
     private static ApiException upstreamFailure(int status) {
