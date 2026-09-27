@@ -1,21 +1,33 @@
 package com.konkuk.memory.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
 public class FileStorageService {
 
-    private final Path rootLocation =
-            Paths.get("uploads").toAbsolutePath().normalize();
+    private final S3Client r2Client;
+    private final String bucketName;
+
+    public FileStorageService(
+            S3Client r2Client,
+            @Value("${R2_BUCKET_NAME}") String bucketName
+    ) {
+        this.r2Client = r2Client;
+        this.bucketName = bucketName;
+    }
 
     public String store(
             MultipartFile file,
@@ -24,66 +36,70 @@ public class FileStorageService {
             String extension
     ) throws IOException {
 
-        String storedFilename =
-                UUID.randomUUID() + extension;
+        String storageKey =
+                userId + "/" +
+                albumId + "/" +
+                UUID.randomUUID() +
+                extension;
 
-        Path directory = rootLocation
-                .resolve(String.valueOf(userId))
-                .resolve(String.valueOf(albumId));
+        try {
+            PutObjectRequest request =
+                    PutObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(storageKey)
+                            .contentType(file.getContentType())
+                            .contentLength(file.getSize())
+                            .build();
 
-        Files.createDirectories(directory);
+            r2Client.putObject(
+                    request,
+                    RequestBody.fromBytes(file.getBytes())
+            );
 
-        Path destination = directory
-                .resolve(storedFilename)
-                .normalize();
+            return storageKey;
 
-        if (!destination.startsWith(rootLocation)) {
-            throw new IOException("잘못된 파일 저장 경로입니다.");
-        }
-
-        // 사진 전체를 byte[]로 만들지 않고 스트리밍으로 저장
-        try (InputStream inputStream = file.getInputStream()) {
-            Files.copy(
-                    inputStream,
-                    destination,
-                    StandardCopyOption.REPLACE_EXISTING
+        } catch (Exception e) {
+            throw new IOException(
+                    "R2 파일 저장에 실패했습니다.",
+                    e
             );
         }
-
-        return rootLocation
-                .relativize(destination)
-                .toString();
     }
 
     public byte[] load(String storageKey) throws IOException {
 
-        Path path = rootLocation
-                .resolve(storageKey)
-                .normalize();
+        try {
+            GetObjectRequest request =
+                    GetObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(storageKey)
+                            .build();
 
-        if (!path.startsWith(rootLocation)) {
-            throw new IOException("잘못된 파일 경로입니다.");
+            ResponseBytes<GetObjectResponse> response =
+                    r2Client.getObjectAsBytes(request);
+
+            return response.asByteArray();
+
+        } catch (Exception e) {
+            throw new IOException(
+                    "R2 파일 조회에 실패했습니다.",
+                    e
+            );
         }
-
-        if (!Files.exists(path)) {
-            throw new IOException("사진 파일을 찾을 수 없습니다.");
-        }
-
-        return Files.readAllBytes(path);
     }
 
     public void delete(String storageKey) {
 
         try {
-            Path path = rootLocation
-                    .resolve(storageKey)
-                    .normalize();
+            DeleteObjectRequest request =
+                    DeleteObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(storageKey)
+                            .build();
 
-            if (path.startsWith(rootLocation)) {
-                Files.deleteIfExists(path);
-            }
+            r2Client.deleteObject(request);
 
-        } catch (IOException ignored) {
+        } catch (Exception ignored) {
         }
     }
 }
