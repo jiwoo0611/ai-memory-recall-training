@@ -151,7 +151,10 @@ public class GeminiPhotoAnalysisClient {
         } catch (ApiException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
-            throw upstreamFailure(ex.getStatusCode().value());
+            throw upstreamFailure(
+                    ex.getStatusCode().value(),
+                    extractUpstreamMessage(ex.getResponseBodyAsString())
+            );
         } catch (JsonProcessingException ex) {
             throw invalidResponse();
         } catch (RestClientException ex) {
@@ -275,6 +278,22 @@ public class GeminiPhotoAnalysisClient {
         return value;
     }
 
+    private String extractUpstreamMessage(String responseBody) {
+        try {
+            String message = objectMapper.readTree(responseBody)
+                    .path("error")
+                    .path("message")
+                    .asText("")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+            return message.length() <= 300
+                    ? message
+                    : message.substring(0, 300);
+        } catch (JsonProcessingException ex) {
+            return "";
+        }
+    }
+
     private static ApiException invalidResponse() {
         return new ApiException(
                 HttpStatus.BAD_GATEWAY,
@@ -291,12 +310,13 @@ public class GeminiPhotoAnalysisClient {
         );
     }
 
-    private static ApiException upstreamFailure(int status) {
+    private static ApiException upstreamFailure(int status, String detail) {
+        String diagnostic = detail.isBlank() ? "" : " (" + detail + ")";
         return switch (status) {
             case 400 -> new ApiException(
                     HttpStatus.BAD_GATEWAY,
                     "AI_REQUEST_REJECTED",
-                    "Gemini가 분석 요청 형식을 거절했습니다."
+                    "Gemini가 분석 요청 형식을 거절했습니다." + diagnostic
             );
             case 401, 403 -> new ApiException(
                     HttpStatus.BAD_GATEWAY,
