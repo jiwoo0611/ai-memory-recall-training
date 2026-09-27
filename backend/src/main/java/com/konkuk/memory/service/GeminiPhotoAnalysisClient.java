@@ -126,12 +126,8 @@ public class GeminiPhotoAnalysisClient {
                         )
                 )),
                 "generationConfig", Map.of(
-                        "responseFormat", Map.of(
-                                "text", Map.of(
-                                        "mimeType", "application/json",
-                                        "schema", RESPONSE_SCHEMA
-                                )
-                        ),
+                        "responseMimeType", "application/json",
+                        "responseJsonSchema", RESPONSE_SCHEMA,
                         "temperature", 0.2
                 )
         );
