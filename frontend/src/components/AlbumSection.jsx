@@ -258,11 +258,13 @@ export default function AlbumSection({ albumId }) {
       const photosToAnalyze = updatedPhotos.filter(
         (photo) => !photo.aiClues?.trim(),
       );
+      const alreadyAnalyzedCount =
+        updatedPhotos.length - photosToAnalyze.length;
 
       for (let index = 0; index < photosToAnalyze.length; index += 1) {
         const photo = photosToAnalyze[index];
         setQuestionGenerationNotice(
-          `사진 AI 분석 중 (${index + 1}/${photosToAnalyze.length})…`,
+          `사진 AI 분석 중 (${alreadyAnalyzedCount + index + 1}/${updatedPhotos.length})…`,
         );
         const analyzedPhoto = await api.analyzePhoto(
           selectedAlbum.id,
