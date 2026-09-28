@@ -178,19 +178,26 @@ public class GeminiQuestionGenerationClient {
                 )
         );
 
-        try {
-            JsonNode response = requestWithRetry(request);
-
-            String output = extractOutput(response);
-            if (output == null || output.isBlank()) {
-                throw invalidResponse();
+        ApiException lastInvalidResponse = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                JsonNode response = requestWithRetry(request);
+                String output = extractOutput(response);
+                if (output == null || output.isBlank()) {
+                    throw invalidResponse();
+                }
+                return normalize(output, allowedPhotoIds);
+            } catch (JsonProcessingException ex) {
+                lastInvalidResponse = invalidResponse();
+            } catch (ApiException ex) {
+                if (!"AI_QUESTION_RESPONSE_INVALID".equals(ex.getCode())) {
+                    throw ex;
+                }
+                lastInvalidResponse = ex;
             }
-            return normalize(output, allowedPhotoIds);
-        } catch (ApiException ex) {
-            throw ex;
-        } catch (JsonProcessingException ex) {
-            throw invalidResponse();
+            log.warn("Gemini returned invalid quiz JSON; regenerating (attempt {})", attempt);
         }
+        throw lastInvalidResponse == null ? invalidResponse() : lastInvalidResponse;
     }
 
     private JsonNode requestWithRetry(Map<String, Object> request) {
@@ -238,24 +245,28 @@ public class GeminiQuestionGenerationClient {
 
         List<GeneratedQuestion> result = new ArrayList<>();
         Set<String> uniqueQuestions = new HashSet<>();
-        Set<String> uniqueAnswers = new HashSet<>();
 
         for (JsonNode item : questions) {
             String content = cleanText(item.path("content").asText(""), 200);
+            if (!content.isBlank() && !content.endsWith("?")) {
+                content += "?";
+            }
+
             Question.Type type;
             try {
                 type = Question.Type.valueOf(item.path("type").asText(""));
             } catch (IllegalArgumentException ex) {
-                throw invalidResponse();
+                continue;
             }
             if (type == Question.Type.EXPERIENCE) {
-                throw invalidResponse();
+                continue;
             }
+
             Question.Difficulty difficulty;
             try {
                 difficulty = Question.Difficulty.valueOf(item.path("difficulty").asText(""));
             } catch (IllegalArgumentException ex) {
-                throw invalidResponse();
+                continue;
             }
 
             List<String> options = new ArrayList<>();
@@ -278,7 +289,9 @@ public class GeminiQuestionGenerationClient {
                 ids.forEach(id -> {
                     if (id.canConvertToLong()) {
                         long value = id.asLong();
-                        if (allowedPhotoIds.contains(value) && !evidencePhotoIds.contains(value)) {
+                        if (allowedPhotoIds.contains(value)
+                                && !evidencePhotoIds.contains(value)
+                                && evidencePhotoIds.size() < 4) {
                             evidencePhotoIds.add(value);
                         }
                     }
@@ -291,7 +304,9 @@ public class GeminiQuestionGenerationClient {
                 displayIds.forEach(id -> {
                     if (id.canConvertToLong()) {
                         long value = id.asLong();
-                        if (evidencePhotoIds.contains(value) && !displayPhotoIds.contains(value)) {
+                        if (evidencePhotoIds.contains(value)
+                                && !displayPhotoIds.contains(value)
+                                && displayPhotoIds.size() < 4) {
                             displayPhotoIds.add(value);
                         }
                     }
@@ -300,7 +315,6 @@ public class GeminiQuestionGenerationClient {
 
             String reference = cleanText(item.path("referenceInformation").asText(""), 1_000);
             if (content.isBlank()
-                    || !content.endsWith("?")
                     || containsPeopleTopic(content)
                     || containsVaguePrompt(content)
                     || !uniqueQuestions.add(content)
@@ -308,16 +322,15 @@ public class GeminiQuestionGenerationClient {
                     || options.stream().anyMatch(GeminiQuestionGenerationClient::containsPeopleTopic)
                     || correctOptionIndex < 0
                     || correctOptionIndex >= options.size()
-                    || !uniqueAnswers.add(options.get(correctOptionIndex))
                     || evidencePhotoIds.isEmpty()
-                    || evidencePhotoIds.size() > 4
-                    || !displayIds.isArray()
-                    || displayPhotoIds.size() != displayIds.size()
-                    || displayPhotoIds.size() > 4
-                    || (difficulty == Question.Difficulty.EASY && !displayPhotoIds.isEmpty())
-                    || (difficulty == Question.Difficulty.HARD && evidencePhotoIds.size() < 2)
                     || reference.isBlank()) {
-                throw invalidResponse();
+                continue;
+            }
+
+            if (difficulty == Question.Difficulty.EASY) {
+                displayPhotoIds.clear();
+            } else if (difficulty == Question.Difficulty.HARD && evidencePhotoIds.size() < 2) {
+                difficulty = Question.Difficulty.MEDIUM;
             }
 
             result.add(new GeneratedQuestion(
@@ -332,12 +345,8 @@ public class GeminiQuestionGenerationClient {
                     reference
             ));
         }
-        long shownCount = result.stream().filter(question -> !question.displayPhotoIds().isEmpty()).count();
-        long easyCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.EASY).count();
-        long mediumCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.MEDIUM).count();
-        long hardCount = result.stream().filter(question -> question.difficulty() == Question.Difficulty.HARD).count();
-        if (shownCount < 2 || result.size() - shownCount < 4
-                || easyCount < 3 || mediumCount < 3 || hardCount < 2) {
+
+        if (result.size() < MIN_AI_QUESTIONS || result.size() > MAX_AI_QUESTIONS) {
             throw invalidResponse();
         }
         return List.copyOf(result);
@@ -351,6 +360,7 @@ public class GeminiQuestionGenerationClient {
         return List.of("어떤 기억", "무엇이 떠오르", "개인적인 기억", "상황과 연결", "이야기해 주세요")
                 .stream().anyMatch(value::contains);
     }
+
     private static boolean containsPeopleTopic(String value) {
         String lowered = value.toLowerCase();
         return List.of("사람 수", "몇 명", "인물", "남성", "여성", "아이", "어린이", "친구", "가족",
@@ -430,6 +440,7 @@ public class GeminiQuestionGenerationClient {
                 "질문 생성 중 Gemini 연결이 끊어졌습니다. 잠시 후 다시 시도해주세요."
         );
     }
+
     private static ApiException invalidResponse() {
         return new ApiException(
                 HttpStatus.BAD_GATEWAY,

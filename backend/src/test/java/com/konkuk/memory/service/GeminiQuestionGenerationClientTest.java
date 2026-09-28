@@ -73,29 +73,35 @@ class GeminiQuestionGenerationClientTest {
     }
 
     @Test
-    void rejectsDisplayPhotoOutsideQuestionEvidence() throws Exception {
+    void removesDisplayPhotoOutsideQuestionEvidence() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
         ObjectNode first = (ObjectNode) root.path("questions").path(3);
         first.set("displayPhotoIds", objectMapper.valueToTree(new Long[]{12L}));
 
-        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
-                .isInstanceOf(ApiException.class)
-                .hasMessageContaining("응답을 질문으로 처리하지 못했습니다");
+        var questions = client.normalize(root.toString(), Set.of(11L, 12L));
+
+        assertThat(questions).hasSize(8);
+        assertThat(questions.get(3).displayPhotoIds()).isEmpty();
     }
 
     @Test
-    void rejectsQuestionWithMoreThanFourEvidencePhotos() throws Exception {
+    void limitsQuestionEvidenceToFourPhotos() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
         ObjectNode first = (ObjectNode) root.path("questions").path(0);
         first.set("evidencePhotoIds", objectMapper.valueToTree(
                 new Long[]{11L, 12L, 13L, 14L, 15L}
         ));
 
-        assertThatThrownBy(() -> client.normalize(
+        var questions = client.normalize(
                 root.toString(),
                 Set.of(11L, 12L, 13L, 14L, 15L)
-        )).isInstanceOf(ApiException.class);
+        );
+
+        assertThat(questions).hasSize(8);
+        assertThat(questions.get(0).evidencePhotoIds())
+                .containsExactly(11L, 12L, 13L, 14L);
     }
+
     private String validOutput(int count) throws Exception {
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode questions = root.putArray("questions");
