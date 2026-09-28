@@ -418,4 +418,12 @@ export const api = {
         signal,
       },
     ),
+  submitQuiz: (id, answers) =>
+    request(
+      `/api/users/me/training-sessions/${encodeURIComponent(id)}/submit`,
+      {
+        method: "POST",
+        body: { answers },
+      },
+    ),
 };

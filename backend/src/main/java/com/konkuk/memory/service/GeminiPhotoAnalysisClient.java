@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -25,6 +27,8 @@ import java.util.Set;
 
 @Service
 public class GeminiPhotoAnalysisClient {
+
+    private static final Logger log = LoggerFactory.getLogger(GeminiPhotoAnalysisClient.class);
 
     private static final String PROVIDER = "google-gemini";
     private static final Set<String> CONFIDENCE_VALUES =
@@ -98,7 +102,7 @@ public class GeminiPhotoAnalysisClient {
                 .build();
         JdkClientHttpRequestFactory requestFactory =
                 new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofSeconds(60));
+        requestFactory.setReadTimeout(Duration.ofSeconds(85));
 
         this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com")
@@ -115,13 +119,15 @@ public class GeminiPhotoAnalysisClient {
             );
         }
 
+        ImagePayloadOptimizer.Payload image = ImagePayloadOptimizer.optimize(imageBytes, contentType);
+
         Map<String, Object> request = Map.of(
                 "contents", List.of(Map.of(
                         "parts", List.of(
                                 Map.of("text", PROMPT),
                                 Map.of("inlineData", Map.of(
-                                        "mimeType", contentType,
-                                        "data", Base64.getEncoder().encodeToString(imageBytes)
+                                        "mimeType", image.contentType(),
+                                        "data", Base64.getEncoder().encodeToString(image.bytes())
                                 ))
                         )
                 )),
@@ -133,13 +139,8 @@ public class GeminiPhotoAnalysisClient {
         );
 
         try {
-            JsonNode response = restClient.post()
-                    .uri("/v1beta/models/{model}:generateContent", model)
-                    .header("x-goog-api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = requestWithRetry(request);
+
 
             String output = extractOutput(response);
 
@@ -150,16 +151,49 @@ public class GeminiPhotoAnalysisClient {
             return normalize(output);
         } catch (ApiException ex) {
             throw ex;
-        } catch (RestClientResponseException ex) {
-            throw upstreamFailure(
-                    ex.getStatusCode().value(),
-                    extractUpstreamMessage(ex.getResponseBodyAsString())
-            );
         } catch (JsonProcessingException ex) {
             throw invalidResponse();
-        } catch (RestClientException ex) {
-            throw connectionFailed();
         }
+    }
+
+    private JsonNode requestWithRetry(Map<String, Object> request) {
+        RestClientException lastFailure = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                return restClient.post()
+                        .uri("/v1beta/models/{model}:generateContent", model)
+                        .header("x-goog-api-key", apiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(request)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (RestClientResponseException ex) {
+                throw upstreamFailure(
+                        ex.getStatusCode().value(),
+                        extractUpstreamMessage(ex.getResponseBodyAsString())
+                );
+            } catch (RestClientException ex) {
+                lastFailure = ex;
+                log.warn("Gemini photo analysis connection failed (attempt {}): {}", attempt, ex.toString());
+                if (isTimeout(ex)) {
+                    throw timeoutFailure();
+                }
+            }
+        }
+        log.warn("Gemini photo analysis failed after retry: {}", String.valueOf(lastFailure));
+        throw connectionFailed();
+    }
+
+    private static boolean isTimeout(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof java.net.http.HttpTimeoutException
+                    || current instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static String extractOutput(JsonNode response) {
@@ -302,11 +336,18 @@ public class GeminiPhotoAnalysisClient {
         );
     }
 
+    private static ApiException timeoutFailure() {
+        return new ApiException(
+                HttpStatus.GATEWAY_TIMEOUT,
+                "AI_ANALYSIS_TIMEOUT",
+                "사진 분석 응답이 지연되었습니다. 잠시 후 다시 시도해주세요."
+        );
+    }
     private static ApiException connectionFailed() {
         return new ApiException(
                 HttpStatus.BAD_GATEWAY,
                 "AI_CONNECTION_FAILED",
-                "Gemini 서버에 연결하지 못했습니다."
+                "사진 분석 중 Gemini 연결이 끊어졌습니다. 잠시 후 다시 시도해주세요."
         );
     }
 

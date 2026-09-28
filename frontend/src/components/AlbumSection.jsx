@@ -15,6 +15,10 @@ export default function AlbumSection({ albumId }) {
 
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumPhotos, setAlbumPhotos] = useState([]);
+  const [quizSessions, setQuizSessions] = useState([]);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [questionGenerationError, setQuestionGenerationError] = useState("");
+  const [questionGenerationNotice, setQuestionGenerationNotice] = useState("");
 
   const [albumTitle, setAlbumTitle] = useState("");
   const [creating, setCreating] = useState(false);
@@ -39,13 +43,24 @@ export default function AlbumSection({ albumId }) {
       setError("");
       try {
         if (albumId) {
-          const [album, photos] = await Promise.all([
+          const [album, photos, sessionPage] = await Promise.all([
             api.album(albumId, controller.signal),
             api.albumPhotos(albumId, controller.signal),
+            api.sessions(0, controller.signal, 100),
           ]);
+          const photoIds = new Set(photos.map((photo) => photo.id));
+          const matchingSessions = sessionPage.content.filter((session) =>
+            photoIds.has(session.photo.id),
+          );
+          const sessionDetails = await Promise.all(
+            matchingSessions.map((session) =>
+              api.detail(session.id, controller.signal),
+            ),
+          );
           if (!controller.signal.aborted) {
             setSelectedAlbum(album);
             setAlbumPhotos(photos);
+            setQuizSessions(sessionDetails);
           }
         } else {
           const albums = await api.albums(controller.signal);
@@ -228,6 +243,61 @@ export default function AlbumSection({ albumId }) {
     }
   };
 
+  const handleGenerateQuestions = async () => {
+    if (!selectedAlbum || !albumPhotos.length) return;
+
+    try {
+      setGeneratingQuestions(true);
+      setQuestionGenerationError("");
+      setQuestionGenerationNotice("");
+
+      let updatedPhotos = albumPhotos;
+      const photosToAnalyze = updatedPhotos.filter(
+        (photo) => !photo.aiClues?.trim(),
+      );
+      const alreadyAnalyzedCount =
+        updatedPhotos.length - photosToAnalyze.length;
+
+      for (let index = 0; index < photosToAnalyze.length; index += 1) {
+        const photo = photosToAnalyze[index];
+        setQuestionGenerationNotice(
+          `전체 ${updatedPhotos.length}장 중 ${alreadyAnalyzedCount + index + 1}번째 사진 AI 분석 중…`,
+        );
+        const analyzedPhoto = await api.analyzePhoto(
+          selectedAlbum.id,
+          photo.id,
+        );
+        updatedPhotos = updatedPhotos.map((item) =>
+          item.id === analyzedPhoto.id ? analyzedPhoto : item,
+        );
+        setAlbumPhotos(updatedPhotos);
+      }
+
+      setQuestionGenerationNotice(
+        `사진 AI 분석 완료 (${updatedPhotos.length}/${updatedPhotos.length}) · 객관식 질문 생성 중…`,
+      );
+      const generatedSession = await api.generateAlbumQuestions(
+        selectedAlbum.id,
+      );
+      setQuizSessions((current) => [
+        generatedSession,
+        ...current.filter(
+          (session) => session.id !== generatedSession.id,
+        ),
+      ]);
+      setQuestionGenerationNotice(
+        `앨범 전체 사진으로 회상 질문 ${generatedSession.questions.length}개를 만들었습니다.`,
+      );
+      location.hash = `#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(generatedSession.id)}`;
+    } catch (err) {
+      setQuestionGenerationNotice("");
+      setQuestionGenerationError(
+        err.message || "앨범 질문 생성에 실패했습니다.",
+      );
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
   const handleDeleteAlbum = async (event, album) => {
     event.stopPropagation();
 
@@ -289,6 +359,19 @@ export default function AlbumSection({ albumId }) {
               flexWrap: "wrap",
             }}
           >
+            {albumPhotos.length > 0 && (
+              <button
+                className="button"
+                type="button"
+                onClick={handleGenerateQuestions}
+                disabled={generatingQuestions || deletingSelected}
+              >
+                {generatingQuestions
+                  ? questionGenerationNotice || "퀴즈 준비 중…"
+                  : "새 퀴즈 생성·시작"}
+              </button>
+            )}
+
             {!selectionMode ? (
               <>
                 {albumPhotos.length > 0 && (
@@ -526,6 +609,72 @@ export default function AlbumSection({ albumId }) {
             })}
           </div>
         )}
+
+        <section className="album-question-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">ALBUM RECALL QUIZ</p>
+              <h2>회상 퀴즈</h2>
+              <p className="muted">
+                앨범 전체의 AI 분석 단서와 촬영 정보를 이용합니다. 문제에 따라
+                관련 사진을 보여주거나 사진 없이 기억을 떠올립니다.
+              </p>
+            </div>
+          </div>
+
+          {questionGenerationError ? (
+            <p className="error" role="alert">
+              {questionGenerationError}
+            </p>
+          ) : null}
+          {questionGenerationNotice ? (
+            <p className="notice" role="status">
+              {questionGenerationNotice}
+            </p>
+          ) : null}
+
+          {!quizSessions.length ? (
+            <Empty>
+              아직 생성된 퀴즈가 없습니다. 위의 ‘새 퀴즈 생성·시작’을 눌러주세요.
+            </Empty>
+          ) : (
+            <div className="quiz-session-list">
+              {quizSessions.map((session) => {
+                const questions = session.questions || [];
+                const compatible =
+                  questions.length > 0 &&
+                  questions.every((question) => question.options?.length === 4);
+                const photoQuestionCount = questions.filter(
+                  (question) => question.displayPhotoIds?.length,
+                ).length;
+
+                return (
+                  <article className="quiz-session-card" key={session.id}>
+                    <div>
+                      <p className="eyebrow">회상 퀴즈 #{session.id}</p>
+                      <h3>객관식 질문 {questions.length}개</h3>
+                      <p className="muted">
+                        사진 제시 {photoQuestionCount}개 · 사진 없이 회상 {questions.length - photoQuestionCount}개
+                      </p>
+                    </div>
+                    {compatible ? (
+                      <a
+                        className="button"
+                        href={`#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(session.id)}`}
+                      >
+                        퀴즈 시작
+                      </a>
+                    ) : (
+                      <span className="legacy-quiz-label">
+                        이전 형식 · 새 퀴즈를 생성해주세요
+                      </span>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </section>
     );
   }

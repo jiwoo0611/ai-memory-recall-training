@@ -1,6 +1,7 @@
 package com.konkuk.memory.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.konkuk.memory.entity.Photo;
@@ -14,7 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class QuestionGenerationPersistenceService {
@@ -66,10 +69,13 @@ public class QuestionGenerationPersistenceService {
                     order++,
                     item.content(),
                     item.type(),
-                    evidenceSnapshot(albumEvidenceJson, item.evidencePhotoIds()),
+                    evidenceSnapshot(albumEvidenceJson, item.evidencePhotoIds(), item.displayPhotoIds(), item.difficulty()),
                     item.verifiable(),
                     item.referenceInformation(),
-                    generationVersion
+                    generationVersion,
+                    Question.Format.MULTIPLE_CHOICE,
+                    writeJson(item.options()),
+                    answerKey(item.correctOptionIndex())
             ));
         }
         session.markInProgress();
@@ -90,22 +96,53 @@ public class QuestionGenerationPersistenceService {
                 ));
     }
 
-    private String evidenceSnapshot(
-            String albumEvidenceJson,
-            List<Long> evidencePhotoIds
-    ) {
+    String evidenceSnapshot(String albumEvidenceJson, List<Long> evidencePhotoIds, List<Long> displayPhotoIds, Question.Difficulty difficulty) {
         try {
+            JsonNode albumEvidence = objectMapper.readTree(albumEvidenceJson);
+            Set<Long> referencedPhotoIds = new LinkedHashSet<>(evidencePhotoIds);
+
             ObjectNode snapshot = objectMapper.createObjectNode();
             snapshot.put("scope", "ALBUM");
-            snapshot.set("albumEvidence", objectMapper.readTree(albumEvidenceJson));
+            if (albumEvidence.path("albumId").canConvertToLong()) {
+                snapshot.put("albumId", albumEvidence.path("albumId").asLong());
+            }
+            var evidencePhotos = snapshot.putArray("photos");
+            JsonNode albumPhotos = albumEvidence.path("photos");
+            if (albumPhotos.isArray()) {
+                albumPhotos.forEach(photo -> {
+                    if (referencedPhotoIds.contains(photo.path("photoId").asLong())) {
+                        evidencePhotos.add(photo.deepCopy());
+                    }
+                });
+            }
             snapshot.set("evidencePhotoIds", objectMapper.valueToTree(evidencePhotoIds));
+            snapshot.set("displayPhotoIds", objectMapper.valueToTree(displayPhotoIds));
+            snapshot.put("difficulty", difficulty.name());
             return objectMapper.writeValueAsString(snapshot);
         } catch (JsonProcessingException ex) {
-            throw new ApiException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "QUESTION_EVIDENCE_FAILED",
-                    "질문 근거를 저장하지 못했습니다."
-            );
+            throw storageFailure();
         }
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            throw storageFailure();
+        }
+    }
+
+    private String answerKey(int correctOptionIndex) {
+        ObjectNode answer = objectMapper.createObjectNode();
+        answer.put("correctOptionIndex", correctOptionIndex);
+        return answer.toString();
+    }
+
+    private static ApiException storageFailure() {
+        return new ApiException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "QUESTION_EVIDENCE_FAILED",
+                "질문 정보를 저장하지 못했습니다."
+        );
     }
 }
