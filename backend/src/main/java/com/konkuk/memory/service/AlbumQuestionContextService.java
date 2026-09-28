@@ -131,6 +131,10 @@ public class AlbumQuestionContextService {
         try {
             JsonNode source = objectMapper.readTree(bounded);
 
+            String summary = clean(source.path("summary").asText(""));
+            if (!summary.isBlank() && !mentionsPeople(summary)) {
+                sanitized.put("contextDescription", summary);
+            }
             ArrayNode foods = sanitized.putArray("foods");
             JsonNode sourceFoods = source.path("foods");
             if (sourceFoods.isArray()) {

@@ -27,7 +27,7 @@ class GeminiQuestionGenerationClientTest {
         var questions = client.normalize(validOutput(8), Set.of(11L, 12L));
 
         assertThat(questions).hasSize(8);
-        assertThat(questions.get(0).content()).isEqualTo("이때 기억나는 단서 1은 무엇인가요?");
+        assertThat(questions.get(0).content()).isEqualTo("장면 1에서 함께 준비한 음식은 무엇인가요?");
         assertThat(questions.get(0).options()).containsExactly("정답 1", "오답 1-A", "오답 1-B", "오답 1-C");
         assertThat(questions.get(0).correctOptionIndex()).isZero();
         assertThat(questions.get(0).evidencePhotoIds()).containsExactly(11L);
@@ -39,7 +39,7 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v3");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v4");
     }
 
     @Test
@@ -67,6 +67,16 @@ class GeminiQuestionGenerationClientTest {
         ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
         ((ObjectNode) root.path("questions").path(0))
                 .put("content", "사진 속 사람은 몇 명이었나요?");
+
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsMetadataOnlyQuestion() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "이 사진은 몇 시에 촬영되었나요?");
 
         assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
                 .isInstanceOf(ApiException.class);
@@ -108,7 +118,7 @@ class GeminiQuestionGenerationClientTest {
         for (int index = 0; index < count; index++) {
             int number = index + 1;
             ObjectNode question = questions.addObject();
-            question.put("content", "이때 기억나는 단서 " + number + "은 무엇인가요?");
+            question.put("content", "장면 " + number + "에서 함께 준비한 음식은 무엇인가요?");
             question.put("type", index % 2 == 0 ? "PHOTO_CLUE" : "CONTEXT");
             question.put("difficulty", index < 3 ? "EASY" : index < 6 ? "MEDIUM" : "HARD");
             question.set("options", objectMapper.valueToTree(new String[]{

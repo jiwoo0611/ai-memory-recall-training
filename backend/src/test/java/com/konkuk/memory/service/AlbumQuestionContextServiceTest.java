@@ -34,7 +34,7 @@ class AlbumQuestionContextServiceTest {
         when(photo.getConfirmedLocation()).thenReturn("사용자 확인 장소");
         when(photo.getAiClues()).thenReturn("""
                 {
-                  "summary": "친구 두 명이 야외에 있음",
+                  "summary": "모닥불 옆 테이블에 음식과 음료가 놓여 있음",
                   "scene": "야외",
                   "peopleCount": 2,
                   "foods": [
@@ -56,7 +56,9 @@ class AlbumQuestionContextServiceTest {
         String evidence = context.evidenceJson();
 
         assertThat(evidence)
-                .contains("2026-05-09T09:00", "37.1,127.1", "피자", "텐트", "캠핑", "Dewar's", "모닥불")
+                .contains("2026-05-09T09:00", "37.1,127.1", "contextDescription",
+                        "모닥불 옆 테이블에 음식과 음료가 놓여 있음",
+                        "피자", "텐트", "캠핑", "Dewar's", "모닥불")
                 .doesNotContain("사용자 입력 앨범명", "2026-05-10", "사용자 확인 장소",
                         "peopleCount", "summary", "scene", "스튜", "친구");
     }
