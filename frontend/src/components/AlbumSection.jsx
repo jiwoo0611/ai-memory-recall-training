@@ -276,7 +276,9 @@ export default function AlbumSection({ albumId }) {
         setAlbumPhotos(updatedPhotos);
       }
 
-      setQuestionGenerationNotice("객관식 질문 생성 중…");
+      setQuestionGenerationNotice(
+        `사진 AI 분석 완료 (${updatedPhotos.length}/${updatedPhotos.length}) · 객관식 질문 생성 중…`,
+      );
       const generatedSession = await api.generateAlbumQuestions(
         selectedAlbum.id,
       );
