@@ -110,10 +110,7 @@ export default function AlbumSection({ albumId }) {
       setUploading(true);
       setUploadError("");
 
-      await api.uploadPhotos(
-        selectedAlbum.id,
-        files,
-      );
+      await api.uploadPhotos(files);
 
       const photos = await api.albumPhotos(
         selectedAlbum.id,
