@@ -17,6 +17,7 @@ export default function AlbumSection({ albumId }) {
   const [albumPhotos, setAlbumPhotos] = useState([]);
   const [quizSessions, setQuizSessions] = useState([]);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [resettingQuestions, setResettingQuestions] = useState(false);
   const [questionGenerationError, setQuestionGenerationError] = useState("");
   const [questionGenerationNotice, setQuestionGenerationNotice] = useState("");
 
@@ -353,6 +354,39 @@ export default function AlbumSection({ albumId }) {
       );
     } finally {
       setGeneratingQuestions(false);
+    }
+  };
+
+  const handleResetQuestions = async () => {
+    if (!selectedAlbum || !quizSessions.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `"${selectedAlbum.title}" 앨범에서 생성된 퀴즈를 모두 초기화할까요?\n사진과 AI 분석 정보는 유지됩니다.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setResettingQuestions(true);
+      setQuestionGenerationError("");
+      setQuestionGenerationNotice("");
+
+      const result = await api.resetAlbumQuestions(
+        selectedAlbum.id,
+      );
+
+      setQuizSessions([]);
+      setQuestionGenerationNotice(
+        `이 앨범의 기존 퀴즈 ${result.deletedSessionCount}개와 질문 ${result.deletedQuestionCount}개를 초기화했습니다.`,
+      );
+    } catch (err) {
+      setQuestionGenerationError(
+        err.message || "퀴즈 초기화에 실패했습니다.",
+      );
+    } finally {
+      setResettingQuestions(false);
     }
   };
 
@@ -738,6 +772,21 @@ export default function AlbumSection({ albumId }) {
                 없이 기억을 떠올립니다.
               </p>
             </div>
+
+            {quizSessions.length > 0 && (
+              <button
+                type="button"
+                onClick={handleResetQuestions}
+                disabled={
+                  resettingQuestions ||
+                  generatingQuestions
+                }
+              >
+                {resettingQuestions
+                  ? "초기화 중..."
+                  : "이 앨범 퀴즈 초기화"}
+              </button>
+            )}
           </div>
 
           {questionGenerationError ? (

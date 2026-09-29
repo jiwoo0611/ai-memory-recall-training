@@ -374,6 +374,11 @@ export const api = {
       `/api/albums/${encodeURIComponent(albumId)}/questions/generate`,
       { method: "POST" },
     ),
+  resetAlbumQuestions: (albumId) =>
+    request(
+      `/api/albums/${encodeURIComponent(albumId)}/questions`,
+      { method: "DELETE" },
+    ),
 
   // 사진 한 장 삭제
   deletePhoto: (albumId, photoId) =>
