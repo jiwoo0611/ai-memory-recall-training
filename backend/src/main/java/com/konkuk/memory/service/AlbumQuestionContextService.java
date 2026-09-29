@@ -86,7 +86,7 @@ public class AlbumQuestionContextService {
                 hasMeaningfulEvidence = true;
             }
 
-            JsonNode sanitizedAiClues = sanitizeAiClues(photo.getAiClues());
+            JsonNode sanitizedAiClues = sanitizeAiClues(photo.getAiClues(), metadataLocation);
             if (!sanitizedAiClues.isEmpty()) {
                 ObjectNode inferred = item.putObject("aiClues");
                 inferred.put("source", "AI_INFERRED");
@@ -119,7 +119,7 @@ public class AlbumQuestionContextService {
         }
     }
 
-    private ObjectNode sanitizeAiClues(String rawValue) {
+    private ObjectNode sanitizeAiClues(String rawValue, String metadataLocation) {
         ObjectNode sanitized = objectMapper.createObjectNode();
         String value = clean(rawValue);
         if (value.isBlank()) {
@@ -158,6 +158,29 @@ public class AlbumQuestionContextService {
                 sanitized.remove("foods");
             }
 
+            ArrayNode landmarks = sanitized.putArray("landmarks");
+            JsonNode sourceLandmarks = source.path("landmarks");
+            if (sourceLandmarks.isArray()) {
+                sourceLandmarks.forEach(landmark -> {
+                    String name = clean(landmark.path("name").asText(""));
+                    String region = clean(landmark.path("region").asText(""));
+                    String confidence = clean(landmark.path("confidence").asText("LOW"))
+                            .toUpperCase(Locale.ROOT);
+                    if (!name.isBlank()
+                            && !mentionsPeople(name)
+                            && "HIGH".equals(confidence)
+                            && sameRegion(metadataLocation, region)) {
+                        ObjectNode item = landmarks.addObject();
+                        item.put("name", name);
+                        item.put("region", region);
+                        item.put("confidence", confidence);
+                    }
+                });
+            }
+            if (landmarks.isEmpty()) {
+                sanitized.remove("landmarks");
+            }
+
             for (String field : ALLOWED_ARRAY_FIELDS) {
                 ArrayNode values = sanitized.putArray(field);
                 JsonNode input = source.path(field);
@@ -184,6 +207,12 @@ public class AlbumQuestionContextService {
     private static boolean mentionsPeople(String value) {
         String lowered = value.toLowerCase(Locale.ROOT);
         return PEOPLE_TERMS.stream().anyMatch(lowered::contains);
+    }
+
+    private static boolean sameRegion(String metadataLocation, String landmarkRegion) {
+        String metadata = clean(metadataLocation);
+        String landmark = clean(landmarkRegion);
+        return !metadata.isBlank() && metadata.equals(landmark);
     }
 
     private static boolean mentionsVisibleText(String value, JsonNode source) {

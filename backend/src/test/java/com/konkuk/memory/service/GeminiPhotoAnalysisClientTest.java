@@ -25,6 +25,9 @@ class GeminiPhotoAnalysisClientTest {
                     {"name": "김치찌개", "confidence": "HIGH"},
                     {"name": "반찬", "confidence": "unknown"}
                   ],
+                  "landmarks": [
+                    {"name": "경복궁", "region": "서울특별시", "confidence": "HIGH"}
+                  ],
                   "objects": ["식탁", "그릇"],
                   "scene": "식사 공간",
                   "activities": ["식사"],
@@ -46,6 +49,12 @@ class GeminiPhotoAnalysisClientTest {
                 .isEqualTo("HIGH");
         assertThat(stored.path("foods").path(1).path("confidence").asText())
                 .isEqualTo("LOW");
+        assertThat(stored.path("landmarks").path(0).path("name").asText())
+                .isEqualTo("경복궁");
+        assertThat(stored.path("landmarks").path(0).path("region").asText())
+                .isEqualTo("서울특별시");
+        assertThat(stored.path("landmarks").path(0).path("confidence").asText())
+                .isEqualTo("HIGH");
         assertThat(stored.path("questionClues").path(0).asText())
                 .isEqualTo("이날 함께 먹은 음식");
         assertThat(stored.path("provider").asText())

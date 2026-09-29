@@ -29,7 +29,7 @@ class AlbumQuestionContextServiceTest {
         when(album.getTitle()).thenReturn("사용자 입력 앨범명");
         when(photo.getId()).thenReturn(11L);
         when(photo.getMetadataTakenAt()).thenReturn(LocalDateTime.parse("2026-05-09T09:00:00"));
-        when(photo.getMetadataLocation()).thenReturn("37.1,127.1");
+        when(photo.getMetadataLocation()).thenReturn("서울특별시");
         when(photo.getConfirmedTakenOn()).thenReturn(LocalDate.parse("2026-05-10"));
         when(photo.getConfirmedLocation()).thenReturn("사용자 확인 장소");
         when(photo.getAiClues()).thenReturn("""
@@ -40,6 +40,11 @@ class AlbumQuestionContextServiceTest {
                   "foods": [
                     {"name": "피자", "confidence": "HIGH"},
                     {"name": "스튜", "confidence": "LOW"}
+                  ],
+                  "landmarks": [
+                    {"name": "경복궁", "region": "서울특별시", "confidence": "HIGH"},
+                    {"name": "일반 건물", "region": "서울특별시", "confidence": "LOW"},
+                    {"name": "광안대교", "region": "부산광역시", "confidence": "HIGH"}
                   ],
                   "objects": ["텐트", "Dewar's 병"],
                   "activities": ["캠핑"],
@@ -56,10 +61,10 @@ class AlbumQuestionContextServiceTest {
         String evidence = context.evidenceJson();
 
         assertThat(evidence)
-                .contains("사용자 입력 앨범명", "2026-05-09T09:00", "37.1,127.1", "contextDescription",
+                .contains("사용자 입력 앨범명", "2026-05-09T09:00", "서울특별시", "contextDescription",
                         "모닥불 옆 테이블에 음식과 음료가 놓여 있음",
-                        "피자", "텐트", "캠핑", "모닥불")
+                        "피자", "경복궁", "텐트", "캠핑", "모닥불")
                 .doesNotContain("Dewar's", "2026-05-10", "사용자 확인 장소",
-                        "peopleCount", "summary", "scene", "스튜", "친구");
+                        "peopleCount", "summary", "scene", "스튜", "일반 건물", "광안대교", "친구");
     }
 }

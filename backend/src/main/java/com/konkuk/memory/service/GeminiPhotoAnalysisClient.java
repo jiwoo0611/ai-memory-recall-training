@@ -43,6 +43,9 @@ public class GeminiPhotoAnalysisClient {
             questionClues에는 당시 무엇을 했고 무엇을 먹거나 마셨는지 떠올리는 데 도움이 되는 사건 수준의 단서를 적으세요.
             불꽃처럼 장면의 중심 대상에서 바로 눈에 띄는 대표 색상은 단서로 사용할 수 있습니다.
             무늬, 문양, 재질, 글자, 로고, 상표, 정확한 개수처럼 자세히 관찰해야 하는 정보는 회상 질문 단서로 사용하지 마세요.
+            유명 랜드마크나 대표 건축물이 장면의 중심에 있고 외형으로 식별 가능하면 landmarks에 이름, 소재 지역, confidence를 적으세요.
+            랜드마크의 region은 서울특별시, 경기도, 부산광역시처럼 대한민국 공식 시·도 1단계 명칭으로 적으세요.
+            일반 건물이나 확실하지 않은 건축물을 유명 장소로 추측하지 말고 LOW로 표시하거나 제외하세요.
             불확실한 내용은 단정하지 말고 uncertainties에 적으세요.
             모든 문자열은 한국어로 작성하세요.
             """;
@@ -65,6 +68,21 @@ public class GeminiPhotoAnalysisClient {
                                     "required", List.of("name", "confidence")
                             )
                     ),
+                    "landmarks", Map.of(
+                            "type", "array",
+                            "items", Map.of(
+                                    "type", "object",
+                                    "properties", Map.of(
+                                            "name", Map.of("type", "string"),
+                                            "region", Map.of("type", "string"),
+                                            "confidence", Map.of(
+                                                    "type", "string",
+                                                    "enum", List.of("HIGH", "MEDIUM", "LOW")
+                                            )
+                                    ),
+                                    "required", List.of("name", "region", "confidence")
+                            )
+                    ),
                     "objects", stringArraySchema(),
                     "scene", Map.of("type", "string"),
                     "activities", stringArraySchema(),
@@ -76,6 +94,7 @@ public class GeminiPhotoAnalysisClient {
             "required", List.of(
                     "summary",
                     "foods",
+                    "landmarks",
                     "objects",
                     "scene",
                     "activities",
@@ -252,6 +271,27 @@ public class GeminiPhotoAnalysisClient {
                     ObjectNode normalizedFood = foods.addObject();
                     normalizedFood.put("name", name);
                     normalizedFood.put("confidence", confidence);
+                }
+            });
+        }
+
+        ArrayNode landmarks = stored.putArray("landmarks");
+        JsonNode sourceLandmarks = source.path("landmarks");
+        if (sourceLandmarks.isArray()) {
+            sourceLandmarks.forEach(landmark -> {
+                String name = cleanText(landmark.path("name").asText(""));
+                String region = cleanText(landmark.path("region").asText(""));
+                if (!name.isBlank() && !region.isBlank()) {
+                    String confidence = landmark.path("confidence")
+                            .asText("LOW")
+                            .toUpperCase();
+                    if (!CONFIDENCE_VALUES.contains(confidence)) {
+                        confidence = "LOW";
+                    }
+                    ObjectNode normalizedLandmark = landmarks.addObject();
+                    normalizedLandmark.put("name", name);
+                    normalizedLandmark.put("region", region);
+                    normalizedLandmark.put("confidence", confidence);
                 }
             });
         }
