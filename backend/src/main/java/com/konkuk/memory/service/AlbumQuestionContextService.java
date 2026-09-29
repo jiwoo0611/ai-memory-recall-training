@@ -25,7 +25,7 @@ public class AlbumQuestionContextService {
 
     private static final int MAX_AI_CLUES_LENGTH = 4_000;
     private static final Set<String> ALLOWED_ARRAY_FIELDS =
-            Set.of("objects", "activities", "visibleText", "questionClues");
+            Set.of("objects", "activities", "questionClues");
     private static final List<String> PEOPLE_TERMS = List.of(
             "사람", "인물", "남성", "여성", "아이", "어린이", "친구", "가족",
             "부부", "연인", "person", "people", "man", "woman", "boy", "girl"
@@ -65,6 +65,7 @@ public class AlbumQuestionContextService {
 
         ObjectNode albumEvidence = objectMapper.createObjectNode();
         albumEvidence.put("albumId", album.getId());
+        albumEvidence.put("albumTitle", clean(album.getTitle()));
         var photoEvidence = albumEvidence.putArray("photos");
         Set<Long> photoIds = new LinkedHashSet<>();
         boolean hasMeaningfulEvidence = false;
@@ -132,7 +133,9 @@ public class AlbumQuestionContextService {
             JsonNode source = objectMapper.readTree(bounded);
 
             String summary = clean(source.path("summary").asText(""));
-            if (!summary.isBlank() && !mentionsPeople(summary)) {
+            if (!summary.isBlank()
+                    && !mentionsPeople(summary)
+                    && !mentionsVisibleText(summary, source)) {
                 sanitized.put("contextDescription", summary);
             }
             ArrayNode foods = sanitized.putArray("foods");
@@ -141,7 +144,10 @@ public class AlbumQuestionContextService {
                 sourceFoods.forEach(food -> {
                     String name = clean(food.path("name").asText(""));
                     String confidence = clean(food.path("confidence").asText("LOW")).toUpperCase(Locale.ROOT);
-                    if (!name.isBlank() && !mentionsPeople(name) && !"LOW".equals(confidence)) {
+                    if (!name.isBlank()
+                            && !mentionsPeople(name)
+                            && !mentionsVisibleText(name, source)
+                            && !"LOW".equals(confidence)) {
                         ObjectNode item = foods.addObject();
                         item.put("name", name);
                         item.put("confidence", confidence);
@@ -158,7 +164,9 @@ public class AlbumQuestionContextService {
                 if (input.isArray()) {
                     input.forEach(node -> {
                         String text = clean(node.asText(""));
-                        if (!text.isBlank() && !mentionsPeople(text)) {
+                        if (!text.isBlank()
+                                && !mentionsPeople(text)
+                                && !mentionsVisibleText(text, source)) {
                             values.add(text);
                         }
                     });
@@ -176,6 +184,21 @@ public class AlbumQuestionContextService {
     private static boolean mentionsPeople(String value) {
         String lowered = value.toLowerCase(Locale.ROOT);
         return PEOPLE_TERMS.stream().anyMatch(lowered::contains);
+    }
+
+    private static boolean mentionsVisibleText(String value, JsonNode source) {
+        String lowered = value.toLowerCase(Locale.ROOT);
+        JsonNode visibleText = source.path("visibleText");
+        if (!visibleText.isArray()) {
+            return false;
+        }
+        for (JsonNode item : visibleText) {
+            String label = clean(item.asText("")).toLowerCase(Locale.ROOT);
+            if (label.length() >= 2 && lowered.contains(label)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void addSourcedValue(ObjectNode target, String field, String value, String source) {

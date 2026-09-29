@@ -41,7 +41,7 @@ class AlbumQuestionContextServiceTest {
                     {"name": "피자", "confidence": "HIGH"},
                     {"name": "스튜", "confidence": "LOW"}
                   ],
-                  "objects": ["텐트"],
+                  "objects": ["텐트", "Dewar's 병"],
                   "activities": ["캠핑"],
                   "visibleText": ["Dewar's"],
                   "questionClues": ["친구와 함께 있음", "모닥불"]
@@ -56,10 +56,10 @@ class AlbumQuestionContextServiceTest {
         String evidence = context.evidenceJson();
 
         assertThat(evidence)
-                .contains("2026-05-09T09:00", "37.1,127.1", "contextDescription",
+                .contains("사용자 입력 앨범명", "2026-05-09T09:00", "37.1,127.1", "contextDescription",
                         "모닥불 옆 테이블에 음식과 음료가 놓여 있음",
-                        "피자", "텐트", "캠핑", "Dewar's", "모닥불")
-                .doesNotContain("사용자 입력 앨범명", "2026-05-10", "사용자 확인 장소",
+                        "피자", "텐트", "캠핑", "모닥불")
+                .doesNotContain("Dewar's", "2026-05-10", "사용자 확인 장소",
                         "peopleCount", "summary", "scene", "스튜", "친구");
     }
 }

@@ -35,11 +35,13 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(3).displayPhotoIds()).containsExactly(11L);
         assertThat(questions.get(0).difficulty()).isEqualTo(Question.Difficulty.EASY);
         assertThat(questions.get(6).difficulty()).isEqualTo(Question.Difficulty.HARD);
+        assertThat(questions.stream().filter(question -> question.difficulty() == Question.Difficulty.HARD))
+                .hasSize(1);
         assertThat(questions.get(2).displayPhotoIds()).isEmpty();
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v4");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v5");
     }
 
     @Test
@@ -80,6 +82,26 @@ class GeminiQuestionGenerationClientTest {
 
         assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
                 .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsQuestionsAboutOverlyFineVisualDetails() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "불멍할 때 화로에 있던 무늬는 무엇인가요?");
+
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void allowsProminentColorQuestions() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "불멍 사진에서 불꽃은 어떤 색이었나요?");
+
+        assertThat(client.normalize(root.toString(), Set.of(11L, 12L)))
+                .hasSize(8);
     }
 
     @Test

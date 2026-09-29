@@ -29,7 +29,7 @@ class TimelineQuestionFactoryTest {
                     {
                       "photoId": 13,
                       "takenAt": {"value": "2026-05-09T18:00:00", "source": "EXIF"},
-                      "aiClues": {"value": {"visibleText": ["Dewar's"]}}
+                      "aiClues": {"value": {"activities": ["모닥불 감상"]}}
                     }
                   ]
                 }
@@ -37,13 +37,13 @@ class TimelineQuestionFactoryTest {
 
         var question = factory.create(evidence).orElseThrow();
 
-        assertThat(question.content()).contains("시간 순서");
+        assertThat(question.content()).contains("장면의 흐름");
         assertThat(question.options()).hasSize(4).doesNotHaveDuplicates();
-        assertThat(question.difficulty()).isEqualTo(com.konkuk.memory.entity.Question.Difficulty.HARD);
+        assertThat(question.difficulty()).isEqualTo(com.konkuk.memory.entity.Question.Difficulty.MEDIUM);
         assertThat(question.options().get(question.correctOptionIndex()))
-                .isEqualTo("캠핑 준비 → 피자 → Dewar's");
+                .isEqualTo("캠핑 준비 → 피자 → 모닥불 감상");
         assertThat(question.evidencePhotoIds()).containsExactly(11L, 12L, 13L);
-        assertThat(question.displayPhotoIds()).containsExactly(11L, 12L, 13L);
+        assertThat(question.displayPhotoIds()).isEmpty();
     }
 
     @Test

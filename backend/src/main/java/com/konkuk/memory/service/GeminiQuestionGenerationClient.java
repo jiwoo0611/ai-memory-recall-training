@@ -33,26 +33,29 @@ public class GeminiQuestionGenerationClient {
     private static final int MIN_AI_QUESTIONS = 8;
     private static final int MAX_AI_QUESTIONS = 11;
     private static final String PROMPT = """
-            당신은 사진 기반 인지 훈련용 회상 퀴즈를 설계하는 전문가입니다.
+            당신은 사진을 계기로 실제 경험을 편안하게 떠올리게 하는 인지 훈련용 회상 퀴즈 전문가입니다.
             아래 JSON은 한 앨범의 사진에서 얻은 통합 근거입니다.
-            앨범 속 실제 경험을 구체적으로 떠올리게 하는 한국어 객관식 질문을 8~11개 만드세요.
+            앨범 속 하루나 사건의 큰 흐름을 떠올리게 하는 쉬운 한국어 객관식 질문을 8~11개 만드세요.
 
             좋은 질문의 기준:
             - 정답은 AI 단서, EXIF 촬영 순서 또는 위치 정보에서 직접 검증되어야 합니다.
-            - 단순 이미지 인식이 아니라 당시 먹은 것, 마신 것, 한 활동, 사용한 물건, 본 상표와 장면 사이의 연결을 회상하게 하세요.
+            - 사용자가 사진을 자세히 관찰하지 않아도 당시의 대표 활동, 음식·음료, 장소 맥락, 사건 순서를 기억으로 답할 수 있어야 합니다.
+            - 한 장의 사소한 특징보다 여러 사진에 반복되거나 사건을 대표하는 단서를 우선하세요.
+            - albumTitle은 사건을 부르는 자연스러운 맥락으로만 사용하고, 제목만 보고 사진에 없는 사실을 만들지 마세요.
             - 질문마다 서로 다른 핵심 기억을 다루고, 같은 정답이나 비슷한 문장 구조를 반복하지 마세요.
             - contextDescription은 사건을 구분하는 배경으로만 사용하고 그 문장 자체를 정답으로 묻지 마세요.
-            - 최종 출력 전에 각 문항을 내부적으로 검토하여 근거성, 회상 가치, 명확성, 오답 품질이 모두 충분한 문항만 남기세요.
+            - 최종 출력 전에 '이 문항이 사소한 관찰력이 아니라 실제 경험 회상을 돕는가'를 검토하고 그렇지 않으면 다시 만드세요.
 
             난이도 기준:
-            - EASY 3개: 사진을 숨기고 한 사진의 명확한 음식, 음료, 상표, 활동 또는 특징적인 물건을 직접 회상합니다.
-            - MEDIUM 3~5개: 같은 날의 서로 다른 단서 2개를 연결하거나, 한 장면을 단서로 연관된 활동·음식·물건을 회상합니다.
-            - HARD 2~3개: 서로 다른 사진 2~4장의 촬영 순서, 전후 활동 또는 사건의 연결 관계를 종합합니다.
+            - EASY 4~6개: 그날의 대표 활동, 먹은 음식, 마신 음료 종류처럼 바로 떠올릴 수 있는 핵심 기억을 묻습니다.
+            - 장면 중심 대상의 두드러진 색상은 EASY에 사용할 수 있습니다. 예: '불멍 사진에서 불꽃은 어떤 색이었나요?'
+            - MEDIUM 3~5개: 같은 날의 장면 2개를 연결하거나 활동과 음식, 준비와 마무리 같은 사건 흐름을 묻습니다.
+            - HARD는 0~1개만 허용하며, 서로 다른 사진 2~3장의 전후 활동이나 사건 순서를 종합합니다.
             - HARD는 evidencePhotoIds에 반드시 서로 다른 사진 ID를 2개 이상 넣으세요.
 
             사진 표시 규칙:
             - 전체 문항 중 2~4개만 사진을 보여주고 나머지는 사진 없이 회상하게 하세요.
-            - 음식·음료·상표·물건 자체가 정답이면 displayPhotoIds를 비우세요.
+            - 음식·음료·활동·물건 자체가 정답이면 displayPhotoIds를 비우세요.
             - 사진을 보여줄 때는 정답이 그대로 보이는 사진 대신 연관 장면을 단서로 제시하세요.
             - displayPhotoIds는 evidencePhotoIds의 부분집합이며 최대 4개입니다.
 
@@ -61,13 +64,19 @@ public class GeminiQuestionGenerationClient {
             - '이때 무엇이 있었나요?'처럼 맥락 없는 질문을 만들지 마세요.
             - '사진에 무엇이 보이나요?', '야외인가요?', '몇 시에 찍었나요?', 좌표·파일명·사진 수를 묻지 마세요.
             - 정확한 촬영 시각은 순서 판단에만 사용하고 시각 자체를 정답으로 만들지 마세요.
+            - 허용: 불꽃 색처럼 사진을 보자마자 알 수 있는 중심 대상의 대표 특징.
+            - 금지: 화로 무늬, 장식 문양, 재질, 병 라벨, 로고, 제품명, 작은 소품, 정확한 개수처럼 확대하거나 자세히 봐야 하는 정보.
+            - 허용: '이때 어떤 종류의 술을 마셨나요?'처럼 위스키·맥주·와인·소주 수준의 종류를 회상하는 질문.
+            - 금지: '어떤 브랜드의 술이었나요?'처럼 특정 상표나 제품명을 맞히는 질문.
             - '어떤 기억이 떠오르나요', '개인적인 기억', '상황과 연결되나요', '이야기해 주세요' 같은 주관식 표현을 쓰지 마세요.
             - 사람 수, 신원, 성별, 관계, 감정에 관한 질문과 선택지를 만들지 마세요.
             - 여행 근거가 없으면 여행이라고 부르지 말고 '이때', '이날', '이 앨범에서'라고 표현하세요.
 
             보기 규칙:
-            - options는 정확히 4개이고 모두 정답과 같은 의미 범주여야 합니다.
+            - options는 정확히 4개이고 모두 정답과 같은 넓은 의미 범주여야 합니다.
             - 오답도 실제로 헷갈릴 법한 비슷한 수준과 구체성을 가져야 하며 우스운 답이나 지나치게 뻔한 답은 금지합니다.
+            - 보기에도 상표명, 문양, 재질, 작은 소품, 정확한 개수 같은 지엽적인 정보를 넣지 마세요.
+            - 술 종류를 묻는 보기에는 위스키·맥주·와인·소주처럼 종류만 넣고 브랜드명은 넣지 마세요.
             - 앨범의 다른 사진에서 정답으로 확인되는 항목을 오답으로 사용하지 마세요.
             - correctOptionIndex는 0부터 시작하는 정답 위치입니다.
 
@@ -254,6 +263,7 @@ public class GeminiQuestionGenerationClient {
 
         List<GeneratedQuestion> result = new ArrayList<>();
         Set<String> uniqueQuestions = new HashSet<>();
+        int hardQuestionCount = 0;
 
         for (JsonNode item : questions) {
             String content = cleanText(item.path("content").asText(""), 200);
@@ -326,6 +336,7 @@ public class GeminiQuestionGenerationClient {
             if (content.isBlank()
                     || containsPeopleTopic(content)
                     || containsVaguePrompt(content)
+                    || containsOverlyFineDetail(content)
                     || !uniqueQuestions.add(content)
                     || options.size() != 4
                     || options.stream().anyMatch(GeminiQuestionGenerationClient::containsPeopleTopic)
@@ -340,6 +351,13 @@ public class GeminiQuestionGenerationClient {
                 displayPhotoIds.clear();
             } else if (difficulty == Question.Difficulty.HARD && evidencePhotoIds.size() < 2) {
                 difficulty = Question.Difficulty.MEDIUM;
+            }
+            if (difficulty == Question.Difficulty.HARD) {
+                if (hardQuestionCount >= 1) {
+                    difficulty = Question.Difficulty.MEDIUM;
+                } else {
+                    hardQuestionCount++;
+                }
             }
 
             result.add(new GeneratedQuestion(
@@ -362,7 +380,7 @@ public class GeminiQuestionGenerationClient {
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v4";
+        return model + ":album-recall-mcq-v5";
     }
 
     private static boolean containsVaguePrompt(String value) {
@@ -378,6 +396,14 @@ public class GeminiQuestionGenerationClient {
         return List.of("사람 수", "몇 명", "인물", "남성", "여성", "아이", "어린이", "친구", "가족",
                         "부부", "연인", "감정", "person", "people", "man", "woman", "boy", "girl")
                 .stream().anyMatch(lowered::contains);
+    }
+
+    private static boolean containsOverlyFineDetail(String value) {
+        return List.of(
+                        "무늬", "문양", "재질", "상표", "브랜드", "제품명", "라벨", "로고",
+                        "몇 개", "몇 병", "몇 잔", "정확한 개수", "적혀 있", "쓰여 있"
+                )
+                .stream().anyMatch(value::contains);
     }
 
     private static String extractOutput(JsonNode response) {

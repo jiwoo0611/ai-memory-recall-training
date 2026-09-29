@@ -54,7 +54,7 @@ public class TimelineQuestionFactory {
             if (candidates.size() < 3) {
                 return Optional.empty();
             }
-            List<TimedClue> selected = List.copyOf(candidates.subList(0, Math.min(4, candidates.size())));
+            List<TimedClue> selected = List.copyOf(candidates.subList(0, Math.min(3, candidates.size())));
             List<String> correct = selected.stream().map(TimedClue::label).toList();
             List<List<String>> sequences = new ArrayList<>();
             sequences.add(correct);
@@ -81,13 +81,13 @@ public class TimelineQuestionFactory {
                     .orElse("");
 
             return Optional.of(new GeminiQuestionGenerationClient.GeneratedQuestion(
-                    "이 앨범의 기억을 촬영한 시간 순서대로 나열한 것은 무엇인가요?",
+                    "이날 경험한 장면의 흐름으로 알맞은 것은 무엇인가요?",
                     Question.Type.INFORMATION_CHECK,
-                    Question.Difficulty.HARD,
+                    Question.Difficulty.MEDIUM,
                     List.copyOf(orderedOptions),
                     correctIndex,
                     selected.stream().map(TimedClue::photoId).toList(),
-                    selected.stream().map(TimedClue::photoId).sorted().toList(),
+                    List.of(),
                     true,
                     reference
             ));
@@ -106,7 +106,7 @@ public class TimelineQuestionFactory {
                 }
             }
         }
-        for (String field : List.of("activities", "visibleText", "objects", "questionClues")) {
+        for (String field : List.of("activities", "questionClues", "objects")) {
             JsonNode values = clues.path(field);
             if (values.isArray()) {
                 for (JsonNode value : values) {
