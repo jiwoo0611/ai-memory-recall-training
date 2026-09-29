@@ -12,6 +12,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ImagePayloadOptimizerTest {
 
     @Test
+    void calculatesSubsamplingBeforeDecodingVeryLargeImages() {
+        assertThat(ImagePayloadOptimizer.sourceSubsampling(12_000, 9_000)).isEqualTo(9);
+        assertThat(ImagePayloadOptimizer.sourceSubsampling(1_280, 960)).isEqualTo(1);
+    }
+
+    @Test
     void shrinksLargePhotoBeforeGeminiUpload() throws Exception {
         BufferedImage source = new BufferedImage(2400, 1600, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < source.getHeight(); y++) {
