@@ -215,7 +215,13 @@ public class GeminiQuestionGenerationClient {
                         .retrieve()
                         .body(JsonNode.class);
             } catch (RestClientResponseException ex) {
-                throw upstreamFailure(ex.getStatusCode().value(), extractUpstreamMessage(ex.getResponseBodyAsString()));
+                int status = ex.getStatusCode().value();
+                String detail = extractUpstreamMessage(ex.getResponseBodyAsString());
+                if (status >= 500 && attempt < 2) {
+                    log.warn("Gemini question generation returned HTTP {}; retrying", status);
+                    continue;
+                }
+                throw upstreamFailure(status, detail);
             } catch (RestClientException ex) {
                 lastFailure = ex;
                 log.warn("Gemini question generation connection failed (attempt {}): {}", attempt, ex.toString());
@@ -391,13 +397,19 @@ public class GeminiQuestionGenerationClient {
         return output;
     }
 
-    private String extractUpstreamMessage(String responseBody) {
+    String extractUpstreamMessage(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return "";
+        }
         try {
-            String message = objectMapper.readTree(responseBody)
-                    .path("error").path("message").asText("")
+            JsonNode body = objectMapper.readTree(responseBody);
+            if (body == null) {
+                return "";
+            }
+            String message = body.path("error").path("message").asText("")
                     .replaceAll("\\s+", " ").trim();
             return message.length() <= 300 ? message : message.substring(0, 300);
-        } catch (JsonProcessingException ex) {
+        } catch (JsonProcessingException | RuntimeException ex) {
             return "";
         }
     }

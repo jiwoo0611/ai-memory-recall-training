@@ -83,6 +83,13 @@ class GeminiQuestionGenerationClientTest {
     }
 
     @Test
+    void safelyHandlesEmptyGeminiErrorBody() {
+        assertThat(client.extractUpstreamMessage(null)).isEmpty();
+        assertThat(client.extractUpstreamMessage("")).isEmpty();
+        assertThat(client.extractUpstreamMessage("not-json")).isEmpty();
+    }
+
+    @Test
     void removesDisplayPhotoOutsideQuestionEvidence() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
         ObjectNode first = (ObjectNode) root.path("questions").path(3);
