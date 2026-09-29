@@ -38,9 +38,11 @@ export default function AlbumSection({ albumId }) {
 
   useEffect(() => {
     const controller = new AbortController();
+
     async function load() {
       setLoading(true);
       setError("");
+
       try {
         if (albumId) {
           const [album, photos, sessionPage] = await Promise.all([
@@ -48,15 +50,19 @@ export default function AlbumSection({ albumId }) {
             api.albumPhotos(albumId, controller.signal),
             api.sessions(0, controller.signal, 100),
           ]);
+
           const photoIds = new Set(photos.map((photo) => photo.id));
+
           const matchingSessions = sessionPage.content.filter((session) =>
             photoIds.has(session.photo.id),
           );
+
           const sessionDetails = await Promise.all(
             matchingSessions.map((session) =>
               api.detail(session.id, controller.signal),
             ),
           );
+
           if (!controller.signal.aborted) {
             setSelectedAlbum(album);
             setAlbumPhotos(photos);
@@ -64,17 +70,24 @@ export default function AlbumSection({ albumId }) {
           }
         } else {
           const albums = await api.albums(controller.signal);
-          if (!controller.signal.aborted) setAlbums(albums);
+
+          if (!controller.signal.aborted) {
+            setAlbums(albums);
+          }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
           setError(err.message || "앨범을 불러오지 못했습니다.");
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
+
     load();
+
     return () => controller.abort();
   }, [albumId]);
 
@@ -114,10 +127,19 @@ export default function AlbumSection({ albumId }) {
     }
   };
 
+  /*
+   * 사진 업로드
+   *
+   * 앨범 목록에서 업로드:
+   *   사진 위치 분석 → 자동 앨범 생성 → 앨범 목록 갱신
+   *
+   * 앨범 상세에서 업로드:
+   *   업로드 완료 후 현재 앨범 사진 목록 갱신
+   */
   const handleUpload = async (event) => {
     const files = Array.from(event.target.files || []);
 
-    if (!files.length || !selectedAlbum) {
+    if (!files.length) {
       return;
     }
 
@@ -125,16 +147,19 @@ export default function AlbumSection({ albumId }) {
       setUploading(true);
       setUploadError("");
 
-      await api.uploadPhotos(
-        selectedAlbum.id,
-        files,
-      );
+      await api.uploadPhotos(files);
 
-      const photos = await api.albumPhotos(
-        selectedAlbum.id,
-      );
+      if (selectedAlbum) {
+        const photos = await api.albumPhotos(
+          selectedAlbum.id,
+        );
 
-      setAlbumPhotos(photos);
+        setAlbumPhotos(photos);
+      } else {
+        const updatedAlbums = await api.albums();
+
+        setAlbums(updatedAlbums);
+      }
     } catch (err) {
       setUploadError(
         err.message || "사진 업로드에 실패했습니다.",
@@ -247,7 +272,9 @@ export default function AlbumSection({ albumId }) {
   };
 
   const handleGenerateQuestions = async () => {
-    if (!selectedAlbum || !albumPhotos.length) return;
+    if (!selectedAlbum || !albumPhotos.length) {
+      return;
+    }
 
     try {
       setGeneratingQuestions(true);
@@ -255,52 +282,80 @@ export default function AlbumSection({ albumId }) {
       setQuestionGenerationNotice("");
 
       let updatedPhotos = albumPhotos;
+
       const photosToAnalyze = updatedPhotos.filter(
         (photo) => !photo.aiClues?.trim(),
       );
+
       const alreadyAnalyzedCount =
         updatedPhotos.length - photosToAnalyze.length;
 
-      for (let index = 0; index < photosToAnalyze.length; index += 1) {
+      for (
+        let index = 0;
+        index < photosToAnalyze.length;
+        index += 1
+      ) {
         const photo = photosToAnalyze[index];
+
         setQuestionGenerationNotice(
-          `전체 ${updatedPhotos.length}장 중 ${alreadyAnalyzedCount + index + 1}번째 사진 AI 분석 중…`,
+          `전체 ${updatedPhotos.length}장 중 ${
+            alreadyAnalyzedCount + index + 1
+          }번째 사진 AI 분석 중…`,
         );
+
         const analyzedPhoto = await api.analyzePhoto(
           selectedAlbum.id,
           photo.id,
         );
+
         updatedPhotos = updatedPhotos.map((item) =>
-          item.id === analyzedPhoto.id ? analyzedPhoto : item,
+          item.id === analyzedPhoto.id
+            ? analyzedPhoto
+            : item,
         );
+
         setAlbumPhotos(updatedPhotos);
       }
 
       setQuestionGenerationNotice(
         `사진 AI 분석 완료 (${updatedPhotos.length}/${updatedPhotos.length}) · 객관식 질문 생성 중…`,
       );
-      const generatedSession = await api.generateAlbumQuestions(
-        selectedAlbum.id,
-      );
+
+      const generatedSession =
+        await api.generateAlbumQuestions(
+          selectedAlbum.id,
+        );
+
       setQuizSessions((current) => [
         generatedSession,
         ...current.filter(
-          (session) => session.id !== generatedSession.id,
+          (session) =>
+            session.id !== generatedSession.id,
         ),
       ]);
+
       setQuestionGenerationNotice(
         `앨범 전체 사진으로 회상 질문 ${generatedSession.questions.length}개를 만들었습니다.`,
       );
-      location.hash = `#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(generatedSession.id)}`;
+
+      location.hash =
+        `#/albums/${encodeURIComponent(
+          selectedAlbum.id,
+        )}/quiz/${encodeURIComponent(
+          generatedSession.id,
+        )}`;
     } catch (err) {
       setQuestionGenerationNotice("");
+
       setQuestionGenerationError(
-        err.message || "앨범 질문 생성에 실패했습니다.",
+        err.message ||
+          "앨범 질문 생성에 실패했습니다.",
       );
     } finally {
       setGeneratingQuestions(false);
     }
   };
+
   const handleDeleteAlbum = async (event, album) => {
     event.stopPropagation();
 
@@ -330,25 +385,54 @@ export default function AlbumSection({ albumId }) {
     }
   };
 
+  /*
+   * ==========================================
+   * 앨범 상세 화면 로딩 / 오류
+   * ==========================================
+   */
   if (albumId && (loading || error)) {
     return (
       <section className="card">
-        <a className="back-link" href="#/mypage">← 앨범 목록</a>
+        <a
+          className="back-link"
+          href="#/mypage"
+        >
+          ← 앨범 목록
+        </a>
+
         {loading ? (
-          <p className="loading" role="status">앨범을 불러오는 중입니다…</p>
+          <p
+            className="loading"
+            role="status"
+          >
+            앨범을 불러오는 중입니다…
+          </p>
         ) : (
-          <p className="error" role="alert">{error}</p>
+          <p
+            className="error"
+            role="alert"
+          >
+            {error}
+          </p>
         )}
       </section>
     );
   }
 
+  /*
+   * ==========================================
+   * 앨범 상세 화면
+   * ==========================================
+   */
   if (albumId && selectedAlbum) {
     return (
       <section className="card">
         <div className="section-heading">
           <div>
-            <a className="back-link" href="#/mypage">
+            <a
+              className="back-link"
+              href="#/mypage"
+            >
               ← 앨범 목록
             </a>
 
@@ -367,10 +451,14 @@ export default function AlbumSection({ albumId }) {
                 className="button"
                 type="button"
                 onClick={handleGenerateQuestions}
-                disabled={generatingQuestions || deletingSelected}
+                disabled={
+                  generatingQuestions ||
+                  deletingSelected
+                }
               >
                 {generatingQuestions
-                  ? questionGenerationNotice || "퀴즈 준비 중…"
+                  ? questionGenerationNotice ||
+                    "퀴즈 준비 중…"
                   : "새 퀴즈 생성·시작"}
               </button>
             )}
@@ -448,7 +536,10 @@ export default function AlbumSection({ albumId }) {
         </div>
 
         {uploadError && (
-          <p className="error" role="alert">
+          <p
+            className="error"
+            role="alert"
+          >
             {uploadError}
           </p>
         )}
@@ -479,7 +570,9 @@ export default function AlbumSection({ albumId }) {
                   onClick={
                     selectionMode
                       ? () =>
-                          handleTogglePhoto(photo.id)
+                          handleTogglePhoto(
+                            photo.id,
+                          )
                       : undefined
                   }
                 >
@@ -488,7 +581,9 @@ export default function AlbumSection({ albumId }) {
                       type="checkbox"
                       checked={isSelected}
                       onChange={() =>
-                        handleTogglePhoto(photo.id)
+                        handleTogglePhoto(
+                          photo.id,
+                        )
                       }
                       onClick={(event) =>
                         event.stopPropagation()
@@ -508,19 +603,24 @@ export default function AlbumSection({ albumId }) {
                   {selectionMode ? (
                     <div>
                       <PhotoImage
-                        albumId={selectedAlbum.id}
+                        albumId={
+                          selectedAlbum.id
+                        }
                         photo={photo}
                       />
 
                       <h3>
-                        {photo.originalFilename}
+                        {
+                          photo.originalFilename
+                        }
                       </h3>
 
                       <p className="muted">
                         {photo.contentType} ·{" "}
-                        {(photo.sizeBytes / 1024).toFixed(
-                          1,
-                        )}{" "}
+                        {(
+                          photo.sizeBytes /
+                          1024
+                        ).toFixed(1)}{" "}
                         KB
                       </p>
 
@@ -552,19 +652,24 @@ export default function AlbumSection({ albumId }) {
                         aria-label={`${photo.originalFilename} 상세 보기`}
                       >
                         <PhotoImage
-                          albumId={selectedAlbum.id}
+                          albumId={
+                            selectedAlbum.id
+                          }
                           photo={photo}
                         />
 
                         <h3>
-                          {photo.originalFilename}
+                          {
+                            photo.originalFilename
+                          }
                         </h3>
 
                         <p className="muted">
                           {photo.contentType} ·{" "}
-                          {(photo.sizeBytes / 1024).toFixed(
-                            1,
-                          )}{" "}
+                          {(
+                            photo.sizeBytes /
+                            1024
+                          ).toFixed(1)}{" "}
                           KB
                         </p>
 
@@ -592,16 +697,20 @@ export default function AlbumSection({ albumId }) {
                       <button
                         type="button"
                         disabled={
-                          deletingPhotoId === photo.id
+                          deletingPhotoId ===
+                          photo.id
                         }
                         onClick={() =>
-                          handleDeletePhoto(photo)
+                          handleDeletePhoto(
+                            photo,
+                          )
                         }
                         style={{
                           marginTop: "16px",
                         }}
                       >
-                        {deletingPhotoId === photo.id
+                        {deletingPhotoId ===
+                        photo.id
                           ? "삭제 중..."
                           : "삭제"}
                       </button>
@@ -616,60 +725,107 @@ export default function AlbumSection({ albumId }) {
         <section className="album-question-panel">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">ALBUM RECALL QUIZ</p>
+              <p className="eyebrow">
+                ALBUM RECALL QUIZ
+              </p>
+
               <h2>회상 퀴즈</h2>
+
               <p className="muted">
-                앨범 전체의 AI 분석 단서와 촬영 정보를 이용합니다. 문제에 따라
-                관련 사진을 보여주거나 사진 없이 기억을 떠올립니다.
+                앨범 전체의 AI 분석 단서와
+                촬영 정보를 이용합니다. 문제에
+                따라 관련 사진을 보여주거나 사진
+                없이 기억을 떠올립니다.
               </p>
             </div>
           </div>
 
           {questionGenerationError ? (
-            <p className="error" role="alert">
+            <p
+              className="error"
+              role="alert"
+            >
               {questionGenerationError}
             </p>
           ) : null}
+
           {questionGenerationNotice ? (
-            <p className="notice" role="status">
+            <p
+              className="notice"
+              role="status"
+            >
               {questionGenerationNotice}
             </p>
           ) : null}
 
           {!quizSessions.length ? (
             <Empty>
-              아직 생성된 퀴즈가 없습니다. 위의 ‘새 퀴즈 생성·시작’을 눌러주세요.
+              아직 생성된 퀴즈가 없습니다.
+              위의 ‘새 퀴즈 생성·시작’을
+              눌러주세요.
             </Empty>
           ) : (
             <div className="quiz-session-list">
               {quizSessions.map((session) => {
-                const questions = session.questions || [];
+                const questions =
+                  session.questions || [];
+
                 const compatible =
                   questions.length > 0 &&
-                  questions.every((question) => question.options?.length === 4);
-                const photoQuestionCount = questions.filter(
-                  (question) => question.displayPhotoIds?.length,
-                ).length;
+                  questions.every(
+                    (question) =>
+                      question.options?.length ===
+                      4,
+                  );
+
+                const photoQuestionCount =
+                  questions.filter(
+                    (question) =>
+                      question.displayPhotoIds
+                        ?.length,
+                  ).length;
 
                 return (
-                  <article className="quiz-session-card" key={session.id}>
+                  <article
+                    className="quiz-session-card"
+                    key={session.id}
+                  >
                     <div>
-                      <p className="eyebrow">회상 퀴즈 #{session.id}</p>
-                      <h3>객관식 질문 {questions.length}개</h3>
+                      <p className="eyebrow">
+                        회상 퀴즈 #
+                        {session.id}
+                      </p>
+
+                      <h3>
+                        객관식 질문{" "}
+                        {questions.length}개
+                      </h3>
+
                       <p className="muted">
-                        사진 제시 {photoQuestionCount}개 · 사진 없이 회상 {questions.length - photoQuestionCount}개
+                        사진 제시{" "}
+                        {photoQuestionCount}개 ·
+                        사진 없이 회상{" "}
+                        {questions.length -
+                          photoQuestionCount}
+                        개
                       </p>
                     </div>
+
                     {compatible ? (
                       <a
                         className="button"
-                        href={`#/albums/${encodeURIComponent(selectedAlbum.id)}/quiz/${encodeURIComponent(session.id)}`}
+                        href={`#/albums/${encodeURIComponent(
+                          selectedAlbum.id,
+                        )}/quiz/${encodeURIComponent(
+                          session.id,
+                        )}`}
                       >
                         퀴즈 시작
                       </a>
                     ) : (
                       <span className="legacy-quiz-label">
-                        이전 형식 · 새 퀴즈를 생성해주세요
+                        이전 형식 · 새 퀴즈를
+                        생성해주세요
                       </span>
                     )}
                   </article>
@@ -682,6 +838,11 @@ export default function AlbumSection({ albumId }) {
     );
   }
 
+  /*
+   * ==========================================
+   * 앨범 목록 화면
+   * ==========================================
+   */
   return (
     <section className="card">
       <div className="section-heading">
@@ -699,6 +860,53 @@ export default function AlbumSection({ albumId }) {
         </div>
       </div>
 
+      {/*
+        자동 분류용 사진 업로드
+        여러 장 선택 가능
+      */}
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "24px",
+          flexWrap: "wrap",
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleUpload}
+        />
+
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() =>
+            fileInputRef.current?.click()
+          }
+        >
+          {uploading
+            ? "업로드 중..."
+            : "+ 사진 추가"}
+        </button>
+      </div>
+
+      {uploadError && (
+        <p
+          className="error"
+          role="alert"
+        >
+          {uploadError}
+        </p>
+      )}
+
+      {/*
+        기존 수동 앨범 생성 기능
+        자동 분류 테스트가 끝날 때까지 유지
+      */}
       <form
         onSubmit={handleCreateAlbum}
         style={{
@@ -713,7 +921,9 @@ export default function AlbumSection({ albumId }) {
           maxLength={10}
           placeholder="새 앨범 이름"
           onChange={(event) =>
-            setAlbumTitle(event.target.value)
+            setAlbumTitle(
+              event.target.value,
+            )
           }
         />
 
@@ -728,7 +938,10 @@ export default function AlbumSection({ albumId }) {
       </form>
 
       {error && (
-        <p className="error" role="alert">
+        <p
+          className="error"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -753,7 +966,9 @@ export default function AlbumSection({ albumId }) {
             >
               <a
                 className="photo-open"
-                href={`#/albums/${encodeURIComponent(album.id)}`}
+                href={`#/albums/${encodeURIComponent(
+                  album.id,
+                )}`}
                 aria-label={`${album.title} 앨범 열기`}
               >
                 <div
@@ -763,26 +978,36 @@ export default function AlbumSection({ albumId }) {
                   📁
                 </div>
 
-                <h3>{album.title}</h3>
+                <h3>
+                  {album.title}
+                </h3>
 
                 <p className="muted">
-                  생성일 {formatDate(album.createdAt)}
+                  생성일{" "}
+                  {formatDate(
+                    album.createdAt,
+                  )}
                 </p>
               </a>
 
               <button
                 type="button"
                 disabled={
-                  deletingAlbumId === album.id
+                  deletingAlbumId ===
+                  album.id
                 }
                 onClick={(event) =>
-                  handleDeleteAlbum(event, album)
+                  handleDeleteAlbum(
+                    event,
+                    album,
+                  )
                 }
                 style={{
                   marginTop: "16px",
                 }}
               >
-                {deletingAlbumId === album.id
+                {deletingAlbumId ===
+                album.id
                   ? "삭제 중..."
                   : "앨범 삭제"}
               </button>

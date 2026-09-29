@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface AlbumRepository extends JpaRepository<Album, Long> {
     List<Album> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
     Optional<Album> findByIdAndUser_Id(Long albumId, Long userId);
+    Optional<Album> findByUser_IdAndTitle(Long userId, String title);
 }

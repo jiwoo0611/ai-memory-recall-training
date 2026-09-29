@@ -27,7 +27,6 @@ import java.util.List;
 @RequestMapping("/api/albums/{albumId}/photos")
 public class PhotoController {
 
-    private final PhotoUploadService photoUploadService;
     private final PhotoQueryService photoQueryService;
     private final PhotoMetadataUpdateService photoMetadataUpdateService;
     private final FileStorageService fileStorageService;
@@ -35,29 +34,17 @@ public class PhotoController {
     private final PhotoAnalysisService photoAnalysisService;
 
     public PhotoController(
-            PhotoUploadService photoUploadService,
             PhotoQueryService photoQueryService,
             PhotoMetadataUpdateService photoMetadataUpdateService,
             FileStorageService fileStorageService,
             PhotoDeleteService photoDeleteService,
             PhotoAnalysisService photoAnalysisService
     ) {
-        this.photoUploadService = photoUploadService;
         this.photoQueryService = photoQueryService;
         this.photoMetadataUpdateService = photoMetadataUpdateService;
         this.fileStorageService = fileStorageService;
         this.photoDeleteService = photoDeleteService;
         this.photoAnalysisService = photoAnalysisService;
-    }
-
-    @PostMapping
-    public List<Long> uploadPhotos(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long albumId,
-            @RequestParam("files") List<MultipartFile> files
-    ) {
-        Long userId = Long.valueOf(jwt.getSubject());
-        return photoUploadService.upload(userId, albumId, files);
     }
 
     @GetMapping

@@ -225,7 +225,7 @@ async function photoImage(albumId, photoId, signal) {
   return response.blob();
 }
 
-async function uploadPhotos(albumId, files) {
+async function uploadPhotos(files) {
   const token = current?.accessToken;
 
   if (!token || current.expiresAt <= Date.now()) {
@@ -246,7 +246,7 @@ async function uploadPhotos(albumId, files) {
 
   try {
     response = await fetch(
-      `${API_BASE_URL}/api/albums/${encodeURIComponent(albumId)}/photos`,
+      `${API_BASE_URL}/api/photos/upload`,
       {
         method: "POST",
         headers: {
