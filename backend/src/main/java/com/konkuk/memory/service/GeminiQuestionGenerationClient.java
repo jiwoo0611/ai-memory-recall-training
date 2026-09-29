@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,7 +47,8 @@ public class GeminiQuestionGenerationClient {
             - landmarks가 없으면 랜드마크나 건축물 이름을 추측하여 질문을 만들지 마세요.
             - 질문마다 서로 다른 핵심 기억을 다루고, 같은 정답이나 비슷한 문장 구조를 반복하지 마세요.
             - contextDescription은 사건을 구분하는 배경으로만 사용하고 그 문장 자체를 정답으로 묻지 마세요.
-            - 최종 출력 전에 '이 문항이 사소한 관찰력이 아니라 실제 경험 회상을 돕는가'를 검토하고 그렇지 않으면 다시 만드세요.
+            - 최종 출력 전에 '사진을 기억하지 않아도 질문 속 단서만으로 정답을 유추할 수 있는가'를 검사하세요. 가능하면 힌트를 빼고 다시 쓰세요.
+            - 다시 검사하여 '이 문항이 사소한 관찰력이 아니라 실제 경험 회상을 돕는가'를 만족하지 않으면 다른 핵심 기억으로 교체하세요.
 
             난이도 기준:
             - EASY 4~6개: 그날의 대표 활동, 먹은 음식, 마신 음료 종류처럼 바로 떠올릴 수 있는 핵심 기억을 묻습니다.
@@ -62,7 +64,14 @@ public class GeminiQuestionGenerationClient {
             - displayPhotoIds는 evidencePhotoIds의 부분집합이며 최대 4개입니다.
 
             질문 문장 규칙:
-            - 사용자가 실제로 답할 수 있도록 사건이나 장면의 구체적인 단서를 질문에 포함하되 정답은 노출하지 마세요.
+            - 질문은 15~45자 정도의 짧고 자연스러운 한 문장으로 쓰세요.
+            - 사건을 구분하는 최소 맥락 하나만 사용하세요. albumTitle, '이날', '이때', 대표 활동 중 하나면 충분합니다.
+            - 정답의 색·모양·재료·맛·용도·종류를 설명하거나, 정답 주변의 물건을 나열하여 정답을 좁히는 힌트를 넣지 마세요.
+            - 질문에 정답 또는 정답 선택지의 단어를 그대로 쓰지 마세요.
+            - 나쁜 예: '모닥불 옆 테이블에서 고기와 함께 마신 갈색 증류주는 무엇인가요?'
+            - 좋은 예: '캠핑에서 마셨던 술의 종류는 무엇인가요?'
+            - 나쁜 예: '큰 기와지붕이 보이는 서울의 대표 궁궐은 어디인가요?'
+            - 좋은 예: '이 여행에서 방문한 대표 건축물은 무엇이었나요?'
             - '이때 무엇이 있었나요?'처럼 맥락 없는 질문을 만들지 마세요.
             - '사진에 무엇이 보이나요?', '야외인가요?', '몇 시에 찍었나요?', 좌표·파일명·사진 수를 묻지 마세요.
             - 촬영 지역 문제는 GPS 메타데이터로 별도 생성하므로 위치 자체를 정답으로 묻는 질문은 만들지 마세요.
@@ -80,6 +89,7 @@ public class GeminiQuestionGenerationClient {
             보기 규칙:
             - options는 정확히 4개이고 모두 정답과 같은 넓은 의미 범주여야 합니다.
             - 오답도 실제로 헷갈릴 법한 비슷한 수준과 구체성을 가져야 하며 우스운 답이나 지나치게 뻔한 답은 금지합니다.
+            - 네 보기는 문법 형태와 구체성, 길이가 비슷해야 하며 하나만 유난히 길거나 자세해서 눈에 띄면 안 됩니다.
             - 보기에도 상표명, 문양, 재질, 작은 소품, 정확한 개수 같은 지엽적인 정보를 넣지 마세요.
             - 술 종류를 묻는 보기에는 위스키·맥주·와인·소주처럼 종류만 넣고 브랜드명은 넣지 마세요.
             - 랜드마크 보기에는 비슷한 종류와 인지도의 장소명을 사용하고, 정답 사진은 보여주지 마세요.
@@ -340,6 +350,7 @@ public class GeminiQuestionGenerationClient {
 
             String reference = cleanText(item.path("referenceInformation").asText(""), 1_000);
             if (content.isBlank()
+                    || content.length() > 80
                     || containsPeopleTopic(content)
                     || containsVaguePrompt(content)
                     || containsOverlyFineDetail(content)
@@ -348,6 +359,7 @@ public class GeminiQuestionGenerationClient {
                     || options.stream().anyMatch(GeminiQuestionGenerationClient::containsPeopleTopic)
                     || correctOptionIndex < 0
                     || correctOptionIndex >= options.size()
+                    || containsOptionInQuestion(content, options)
                     || evidencePhotoIds.isEmpty()
                     || reference.isBlank()) {
                 continue;
@@ -386,7 +398,20 @@ public class GeminiQuestionGenerationClient {
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v5";
+        return model + ":album-recall-mcq-v6";
+    }
+
+    private static boolean containsOptionInQuestion(String content, List<String> options) {
+        String normalizedContent = normalizeForComparison(content);
+        return options.stream()
+                .map(GeminiQuestionGenerationClient::normalizeForComparison)
+                .anyMatch(option -> option.length() >= 2 && normalizedContent.contains(option));
+    }
+
+    private static String normalizeForComparison(String value) {
+        return value == null
+                ? ""
+                : value.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
     }
 
     private static boolean containsVaguePrompt(String value) {

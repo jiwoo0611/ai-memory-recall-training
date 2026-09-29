@@ -41,7 +41,7 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v5");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v6");
     }
 
     @Test
@@ -89,6 +89,26 @@ class GeminiQuestionGenerationClientTest {
         ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
         ((ObjectNode) root.path("questions").path(0))
                 .put("content", "불멍할 때 화로에 있던 무늬는 무엇인가요?");
+
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsQuestionThatContainsItsCorrectAnswer() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "캠핑에서 정답 1을 먹었던 때를 기억하나요?");
+
+        assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsOverExplainedQuestion() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(8));
+        ((ObjectNode) root.path("questions").path(0))
+                .put("content", "캠핑을 하던 날 모닥불 옆에 놓인 테이블에서 여러 음식과 함께 준비해서 마셨던 음료의 종류 가운데 당시 사진 속 장면과 가장 잘 맞는 것은 무엇인가요?");
 
         assertThatThrownBy(() -> client.normalize(root.toString(), Set.of(11L, 12L)))
                 .isInstanceOf(ApiException.class);
