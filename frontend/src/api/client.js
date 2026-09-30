@@ -344,7 +344,7 @@ export const api = {
 
     //앨범 이름 변경
   updateAlbumTitle: (albumId, title) =>
-    request('/api/albums/${encodeURIComponent(albumId)}',
+    request(`/api/albums/${encodeURIComponent(albumId)} `,
     {
         method: "PATCH",
         body: { title },
