@@ -30,6 +30,11 @@ export default function AlbumSection({ albumId }) {
   const [deletingPhotoId, setDeletingPhotoId] = useState(null);
   const [deletingAlbumId, setDeletingAlbumId] = useState(null);
 
+  // 앨범 이름 변경
+  const [editingAlbumId, setEditingAlbumId] = useState(null);
+  const [editingAlbumTitle, setEditingAlbumTitle] = useState(null);
+  const [updatingAlbumId, setUpdatingAlbumId] = useState(null);
+
   // 사진 선택 삭제
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
@@ -172,6 +177,65 @@ export default function AlbumSection({ albumId }) {
       event.target.value = "";
     }
   };
+
+const handleStartEditAlbum = (event, album) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  setEditingAlbumId(album.id);
+  setEditingAlbumTitle(album.title);
+  setError("");
+};
+
+const handleCancelEditAlbum = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  setEditingAlbumId(null);
+  setEditingAlbumTitle("");
+};
+
+const handleUpdateAlbumTitle = async (event, album) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const title = editingAlbumTitle.trim();
+
+  if (!title) {
+    setError("앨범 이름을 입력해주세요.");
+    return;
+  }
+
+  if (title.length > 10) {
+    setError("앨범 이름은 10자 이하여야 합니다.");
+    return;
+  }
+
+  try {
+    setUpdatingAlbumId(album.id);
+    setError("");
+
+    const updatedAlbum = await api.updateAlbumTitle(
+      album.id,
+      title,
+    );
+
+    setAlbums((previous) =>
+      previous.map((item) =>
+        item.id === album.id ? updatedAlbum : item,
+      ),
+    );
+
+    setEditingAlbumId(null);
+    setEditingAlbumTitle("");
+  } catch (err) {
+    setError(
+      err.message || "앨범 이름 변경에 실패했습니다.",
+    );
+  } finally {
+    setUpdatingAlbumId(null);
+  }
+};
 
   const handleDeletePhoto = async (photo) => {
     if (!selectedAlbum) return;
@@ -1034,6 +1098,61 @@ export default function AlbumSection({ albumId }) {
                 </p>
               </a>
 
+        {editingAlbumId === album.id ? (
+          <form
+            onSubmit={(event) =>
+              handleUpdateAlbumTitle(event, album)
+            }
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              marginTop: "16px",
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            <input
+              type="text"
+              value={editingAlbumTitle}
+              maxLength={10}
+              autoFocus
+              placeholder="앨범 이름"
+              onChange={(event) =>
+                setEditingAlbumTitle(event.target.value)
+              }
+            />
+
+            <button
+              type="submit"
+              disabled={updatingAlbumId === album.id}
+            >
+              {updatingAlbumId === album.id
+                ? "저장 중..."
+                : "저장"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCancelEditAlbum}
+              disabled={updatingAlbumId === album.id}
+            >
+              취소
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={(event) =>
+              handleStartEditAlbum(event, album)
+            }
+            style={{
+              marginTop: "16px",
+              marginRight: "8px",
+            }}
+          >
+            이름 변경
+          </button>
+        )}
               <button
                 type="button"
                 disabled={

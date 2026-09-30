@@ -22,18 +22,18 @@ public class AlbumService {
     private final AlbumRepository albumRepository;
     private final UserRepository userRepository;
     private final PhotoRepository photoRepository;
-    private final StorageDeletionQueue deletionQueue;
+    private final FileStorageService fileStorageService;
 
     public AlbumService(
             AlbumRepository albumRepository,
             UserRepository userRepository,
             PhotoRepository photoRepository,
-            StorageDeletionQueue deletionQueue
+            FileStorageService fileStorageService
     ) {
         this.albumRepository = albumRepository;
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
-        this.deletionQueue = deletionQueue;
+        this.fileStorageService = fileStorageService;
     }
 
     @Transactional
@@ -90,6 +90,27 @@ public class AlbumService {
     }
 
     @Transactional
+    public AlbumResponse updateTitle(
+            Long userId,
+            Long albumId,
+            String title
+    ) {
+        Album album = albumRepository
+                .findByIdAndUser_Id(albumId, userId)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "ALBUM_NOT_FOUND",
+                        "앨범을 찾을 수 없습니다."
+                ));
+
+        String trimmedTitle = title.trim();
+
+        album.changeTitle(trimmedTitle);
+
+        return AlbumResponse.from(album);
+    }
+
+    @Transactional
     public void deleteAlbum(
             Long userId,
             Long albumId
@@ -110,7 +131,7 @@ public class AlbumService {
                         );
 
         for (Photo photo : photos) {
-            deletionQueue.enqueue(
+            fileStorageService.delete(
                     photo.getStorageKey()
             );
         }
