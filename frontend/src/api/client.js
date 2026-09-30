@@ -1,7 +1,11 @@
 const configuredUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:18080";
 
-export const API_BASE_URL = configuredUrl.replace(/\/+$/, "");
+// The local browser can resolve localhost while a loopback address may be blocked
+// by the embedded browser's network isolation. Normalize old local env values.
+export const API_BASE_URL = configuredUrl
+  .replace("http://127.0.0.1:18080", "http://localhost:18080")
+  .replace(/\/+$/, "");
 
 const STORAGE_KEY = "memory-recall-session";
 let current = readSession();
@@ -243,6 +247,8 @@ async function uploadPhotos(files) {
   }
 
   let response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
     response = await fetch(
@@ -252,13 +258,19 @@ async function uploadPhotos(files) {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: controller.signal,
         body: formData,
       },
     );
-  } catch {
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("사진 업로드가 30초 안에 완료되지 않았습니다. 사진 수나 파일 크기를 줄여 다시 시도해주세요.");
+    }
     throw new Error(
       "사진 업로드 중 서버에 연결할 수 없습니다.",
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   const text = await response.text();
@@ -290,6 +302,10 @@ async function uploadPhotos(files) {
 }
 
 export const api = {
+  submitRecall: (id, answers) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/answers`, { method: "POST", body: { answers } }),
+  feedback: (id) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/feedback`, { method: "POST" }),
+  retrain: (id, requestId) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/retrain`, { method: "POST", body: { requestId } }),
+  photoSessions: (photoId, page, signal) => request(`/api/users/me/training-sessions?photoId=${encodeURIComponent(photoId)}&page=${page}&size=6`, { signal }),
   signup: (body) =>
     request("/api/auth/signup", {
       method: "POST",

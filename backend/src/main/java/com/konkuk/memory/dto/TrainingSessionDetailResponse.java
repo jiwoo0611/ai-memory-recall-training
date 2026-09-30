@@ -10,6 +10,10 @@ import java.util.List;
 public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryResponse.PhotoInfo photo,
                                             TrainingSession.Status status, Instant startedAt, Instant completedAt,
                                             List<QuestionInfo> questions, ResultInfo result) {
+    @com.fasterxml.jackson.annotation.JsonProperty("respondedCount")
+    public int respondedCount() { return (int) questions.stream().filter(q -> q.answer() != null).count(); }
+    @com.fasterxml.jackson.annotation.JsonProperty("questionCount")
+    public int questionCount() { return questions.size(); }
     public record QuestionInfo(Long id, int questionOrder, String content, Question.Type type,
                                Question.Format format, Question.Difficulty difficulty, List<String> options, List<Long> displayPhotoIds, AnswerInfo answer) {
         public static QuestionInfo from(Question question, Answer answer, ObjectMapper objectMapper) {
@@ -22,7 +26,7 @@ public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryRespo
                     readDifficulty(question.getEvidenceSnapshot(), objectMapper),
                     readOptions(question.getOptionsJson(), objectMapper),
                     readDisplayPhotoIds(question.getEvidenceSnapshot(), objectMapper),
-                    answer == null ? null : AnswerInfo.from(answer)
+                    answer == null ? null : AnswerInfo.from(answer, objectMapper)
             );
         }
 
@@ -59,17 +63,30 @@ public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryRespo
         }
     }
 
-    public record AnswerInfo(Long id, Answer.Status status, String content, Instant createdAt) {
-        public static AnswerInfo from(Answer answer) {
-            return new AnswerInfo(answer.getId(), answer.getStatus(), answer.getContent(), answer.getCreatedAt());
+    public record AnswerInfo(Long id, Answer.Status status, String content, Instant createdAt,
+                             Integer selectedOptionIndex, Boolean correct,
+                             Integer correctOptionIndex, String correctOption) {
+        public static AnswerInfo from(Answer answer, ObjectMapper mapper) {
+            Integer correctIndex = null;
+            String correctOption = null;
+            if (answer.getCorrect() != null) {
+                try {
+                    correctIndex = mapper.readTree(answer.getQuestion().getAnswerKey()).path("correctOptionIndex").intValue();
+                    correctOption = mapper.readTree(answer.getQuestion().getOptionsJson()).get(correctIndex).asText();
+                } catch (Exception ex) { throw new IllegalStateException("Invalid saved quiz snapshot", ex); }
+            }
+            return new AnswerInfo(answer.getId(), answer.getStatus(), answer.getContent(), answer.getCreatedAt(),
+                    answer.getSelectedOptionIndex(), answer.getCorrect(), correctIndex, correctOption);
         }
     }
 
     public record ResultInfo(Long id, Result.FeedbackStatus feedbackStatus, String summary,
-                             int answeredCount, int cannotRecallCount, int mismatchCount) {
+                             int answeredCount, int cannotRecallCount, int mismatchCount,
+                             Integer totalCount, Integer correctCount, Integer incorrectCount, String generationVersion) {
         public static ResultInfo from(Result result) {
             return new ResultInfo(result.getId(), result.getFeedbackStatus(), result.getSummary(),
-                    result.getAnsweredCount(), result.getCannotRecallCount(), result.getMismatchCount());
+                    result.getAnsweredCount(), result.getCannotRecallCount(), result.getMismatchCount(),
+                    result.getTotalCount(), result.getCorrectCount(), result.getIncorrectCount(), result.getGenerationVersion());
         }
     }
 }

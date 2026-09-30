@@ -148,7 +148,9 @@ export default function AlbumSection({ albumId }) {
       setUploading(true);
       setUploadError("");
 
+      setUploadError(`사진 ${files.length}장 저장 중… 파일 크기에 따라 최대 30초 정도 걸릴 수 있습니다.`);
       await api.uploadPhotos(files);
+      setUploadError("");
 
       if (selectedAlbum) {
         const photos = await api.albumPhotos(
@@ -175,7 +177,7 @@ export default function AlbumSection({ albumId }) {
     if (!selectedAlbum) return;
 
     const confirmed = window.confirm(
-      `"${photo.originalFilename}" 사진을 삭제할까요?`,
+      `"${photo.originalFilename}" 사진과 연결된 모든 훈련·질문·답변·결과를 삭제할까요? 삭제 후 복구할 수 없습니다.`,
     );
 
     if (!confirmed) return;
@@ -239,7 +241,7 @@ export default function AlbumSection({ albumId }) {
     }
 
     const confirmed = window.confirm(
-      `선택한 사진 ${selectedPhotoIds.length}장을 삭제할까요?`,
+      `선택한 사진 ${selectedPhotoIds.length}장과 연결된 모든 훈련·질문·답변·결과를 삭제할까요? 삭제 후 복구할 수 없습니다.`,
     );
 
     if (!confirmed) return;
@@ -363,7 +365,7 @@ export default function AlbumSection({ albumId }) {
     }
 
     const confirmed = window.confirm(
-      `"${selectedAlbum.title}" 앨범에서 생성된 퀴즈를 모두 초기화할까요?\n사진과 AI 분석 정보는 유지됩니다.`,
+      `"${selectedAlbum.title}" 앨범의 모든 훈련·질문·답변·결과를 영구 삭제할까요?\n사진과 AI 분석 정보는 유지됩니다. 재훈련은 결과 화면의 ‘같은 사진으로 새 훈련’을 이용해주세요.`,
     );
 
     if (!confirmed) return;
@@ -394,7 +396,7 @@ export default function AlbumSection({ albumId }) {
     event.stopPropagation();
 
     const confirmed = window.confirm(
-      `"${album.title}" 앨범을 삭제할까요?\n앨범 안의 사진도 모두 삭제됩니다.`,
+      `"${album.title}" 앨범을 삭제할까요?\n앨범 안의 사진과 연결된 모든 훈련·질문·답변·결과가 함께 삭제되며 복구할 수 없습니다.`,
     );
 
     if (!confirmed) return;
@@ -819,13 +821,7 @@ export default function AlbumSection({ albumId }) {
                 const questions =
                   session.questions || [];
 
-                const compatible =
-                  questions.length > 0 &&
-                  questions.every(
-                    (question) =>
-                      question.options?.length ===
-                      4,
-                  );
+                const compatible = questions.length > 0;
 
                 const photoQuestionCount =
                   questions.filter(
@@ -846,7 +842,7 @@ export default function AlbumSection({ albumId }) {
                       </p>
 
                       <h3>
-                        객관식 질문{" "}
+                        회상 질문{" "}
                         {questions.length}개
                       </h3>
 
@@ -869,12 +865,11 @@ export default function AlbumSection({ albumId }) {
                           session.id,
                         )}`}
                       >
-                        퀴즈 시작
+                        {session.status === "COMPLETED" ? "저장된 결과 보기" : "답변 작성하기"}
                       </a>
                     ) : (
                       <span className="legacy-quiz-label">
-                        이전 형식 · 새 퀴즈를
-                        생성해주세요
+                        아직 질문이 준비되지 않았습니다
                       </span>
                     )}
                   </article>

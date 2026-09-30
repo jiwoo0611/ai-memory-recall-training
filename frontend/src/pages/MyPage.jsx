@@ -120,6 +120,7 @@ function SessionDetail({ id, onClose }) {
             </p>
 
             <h3>질문과 답변</h3>
+            <p><a className="button" href={`#/training/${data.id}`}>{data.status === "COMPLETED" ? "저장된 결과 보기" : "답변 작성·훈련 열기"}</a></p>
 
             {!data.questions.length ? (
               <Empty>
@@ -150,6 +151,7 @@ function SessionDetail({ id, onClose }) {
                             q.answer.status
                           ]}
                       </p>
+                      {q.answer.correct != null && <p>{q.answer.correct ? "정답" : "오답"} · 정답: {q.answer.correctOption}</p>}
 
                       <small className="muted">
                         {date(
@@ -183,6 +185,7 @@ function SessionDetail({ id, onClose }) {
                 </p>
 
                 <div className="result-counts">
+                  {data.result.correctCount != null && <><span>정답 {data.result.correctCount} / {data.result.totalCount}</span><span>오답 {data.result.incorrectCount}</span></>}
                   <span>
                     답변{" "}
                     {
@@ -226,6 +229,7 @@ export default function MyPage({ albumId }) {
 
   const [selected, setSelected] =
     useState(null);
+  const [photoFilter, setPhotoFilter] = useState(null);
 
   const profile = useLoad(
     api.me,
@@ -234,11 +238,11 @@ export default function MyPage({ albumId }) {
 
   const trainings = useLoad(
     (signal) =>
-      api.sessions(
+      photoFilter ? api.photoSessions(photoFilter, trainingPage, signal) : api.sessions(
         trainingPage,
         signal,
       ),
-    trainingPage,
+    `${trainingPage}-${photoFilter}`,
   );
 
   const recent = useLoad(
@@ -367,6 +371,7 @@ export default function MyPage({ albumId }) {
               </h2>
             </div>
 
+            {photoFilter && <p>사진 #{photoFilter}의 기록 <button onClick={() => { setPhotoFilter(null); setTrainingPage(0); }}>전체 기록 보기</button></p>}
             <LoadState
               state={trainings}
             >
@@ -420,6 +425,8 @@ export default function MyPage({ albumId }) {
                                   s.completedAt,
                                 )}
                               </p>
+                              {s.result?.correctCount != null && <p>정답 {s.result.correctCount} / {s.result.totalCount} · 오답 {s.result.incorrectCount}</p>}
+                              <button onClick={() => { setPhotoFilter(s.photo.id); setTrainingPage(0); setSelected(null); }}>같은 사진의 기록</button>
                             </div>
 
                             <button

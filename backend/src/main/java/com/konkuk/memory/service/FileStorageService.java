@@ -21,13 +21,19 @@ public class FileStorageService {
 
     private final S3Client r2Client;
     private final String bucketName;
+    private final boolean local;
+    private final java.nio.file.Path root;
 
     public FileStorageService(
-            S3Client r2Client,
-            @Value("${R2_BUCKET_NAME}") String bucketName
+            org.springframework.beans.factory.ObjectProvider<S3Client> r2Client,
+            @Value("${R2_BUCKET_NAME:}") String bucketName,
+            @Value("${app.storage.mode:r2}") String mode,
+            @Value("${app.storage.directory:uploads}") String directory
     ) {
-        this.r2Client = r2Client;
+        this.r2Client = r2Client.getIfAvailable();
         this.bucketName = bucketName;
+        this.local = "local".equals(mode);
+        this.root = java.nio.file.Path.of(directory).toAbsolutePath().normalize();
     }
 
     public String store(
@@ -44,6 +50,12 @@ public class FileStorageService {
                 extension;
 
         try {
+            if (local) {
+                var path = localPath(storageKey);
+                java.nio.file.Files.createDirectories(path.getParent());
+                try (var stream = file.getInputStream()) { java.nio.file.Files.copy(stream, path); }
+                return storageKey;
+            }
             PutObjectRequest request =
                     PutObjectRequest.builder()
                             .bucket(bucketName)
@@ -75,6 +87,7 @@ public class FileStorageService {
     public byte[] load(String storageKey) throws IOException {
 
         try {
+            if (local) return java.nio.file.Files.readAllBytes(localPath(storageKey));
             GetObjectRequest request =
                     GetObjectRequest.builder()
                             .bucket(bucketName)
@@ -97,6 +110,7 @@ public class FileStorageService {
     public void delete(String storageKey) {
 
         try {
+            if (local) { java.nio.file.Files.deleteIfExists(localPath(storageKey)); return; }
             DeleteObjectRequest request =
                     DeleteObjectRequest.builder()
                             .bucket(bucketName)
@@ -105,7 +119,13 @@ public class FileStorageService {
 
             r2Client.deleteObject(request);
 
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            throw new IllegalStateException("사진 파일 삭제를 재시도해야 합니다.", ex);
         }
+    }
+    private java.nio.file.Path localPath(String key) throws IOException {
+        var path = root.resolve(key).normalize();
+        if (!path.startsWith(root) || path.equals(root)) throw new IOException("잘못된 사진 경로입니다.");
+        return path;
     }
 }

@@ -22,18 +22,18 @@ public class AlbumService {
     private final AlbumRepository albumRepository;
     private final UserRepository userRepository;
     private final PhotoRepository photoRepository;
-    private final FileStorageService fileStorageService;
+    private final StorageDeletionQueue deletionQueue;
 
     public AlbumService(
             AlbumRepository albumRepository,
             UserRepository userRepository,
             PhotoRepository photoRepository,
-            FileStorageService fileStorageService
+            StorageDeletionQueue deletionQueue
     ) {
         this.albumRepository = albumRepository;
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
-        this.fileStorageService = fileStorageService;
+        this.deletionQueue = deletionQueue;
     }
 
     @Transactional
@@ -110,7 +110,7 @@ public class AlbumService {
                         );
 
         for (Photo photo : photos) {
-            fileStorageService.delete(
+            deletionQueue.enqueue(
                     photo.getStorageKey()
             );
         }

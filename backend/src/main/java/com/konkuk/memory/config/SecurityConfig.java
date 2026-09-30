@@ -41,12 +41,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey key, JwtProperties properties, RevokedTokenStore revokedTokens) {
+    JwtDecoder jwtDecoder(SecretKey key, JwtProperties properties, RevokedTokenStore revokedTokens,
+                          com.konkuk.memory.repository.UserRepository users) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         OAuth2TokenValidator<Jwt> requiredClaims = jwt -> {
             try {
                 if (jwt.getExpiresAt() != null && jwt.getIssuedAt() != null
-                        && Long.parseLong(jwt.getSubject()) > 0 && jwt.getAudience().contains("memory-recall-api")) {
+                        && Long.parseLong(jwt.getSubject()) > 0 && users.existsById(Long.valueOf(jwt.getSubject()))
+                        && jwt.getAudience().contains("memory-recall-api")) {
                     return OAuth2TokenValidatorResult.success();
                 }
             } catch (RuntimeException ignored) { /* Reject malformed subjects without logging tokens. */ }

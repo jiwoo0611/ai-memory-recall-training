@@ -4,7 +4,7 @@ import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MyPage from "./pages/MyPage";
 import PhotoDetailPage from "./pages/PhotoDetailPage";
-import QuizPage from "./pages/QuizPage";
+import RecallPage from "./pages/RecallPage";
 import { ErrorBox } from "./components/UI";
 const route = () => location.hash.slice(1).split("?")[0] || "/";
 // Authentication redirects replace the current entry; ordinary links keep history.
@@ -18,6 +18,7 @@ export default function App() {
   const [logoutError, setLogoutError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const albumRoute = page.match(/^\/albums\/([^/]+)$/);
+  const trainingRoute = page.match(/^\/training\/([^/]+)$/);
   const quizRoute = page.match(/^\/albums\/([^/]+)\/quiz\/([^/]+)$/);
   const photoRoute = page.match(
     /^\/albums\/([^/]+)\/photos\/([^/]+)$/,
@@ -57,7 +58,7 @@ export default function App() {
     };
   }, [auth]);
   useEffect(() => {
-    if ((page === "/mypage" || albumRoute || quizRoute || photoRoute) && !auth) {
+    if ((page === "/mypage" || albumRoute || quizRoute || photoRoute || trainingRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
       redirect("/login");
     }
@@ -114,9 +115,12 @@ export default function App() {
     ) : (
       <p role="status">로그인 화면으로 이동합니다…</p>
     );
+  else if (trainingRoute)
+    content = auth ? <RecallPage key={`${auth.accessToken}-${trainingRoute[1]}`} sessionId={decodeURIComponent(trainingRoute[1])} /> : <p role="status">로그인 화면으로 이동합니다…</p>;
   else if (quizRoute)
     content = auth ? (
-      <QuizPage
+      <RecallPage
+        key={`${auth.accessToken}-${quizRoute[2]}`}
         albumId={decodeURIComponent(quizRoute[1])}
         sessionId={decodeURIComponent(quizRoute[2])}
       />

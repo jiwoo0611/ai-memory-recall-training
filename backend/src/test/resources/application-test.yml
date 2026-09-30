@@ -10,6 +10,8 @@ spring:
         type:
           preferred_instant_jdbc_type: TIMESTAMP
 app:
+  storage:
+    mode: local
   jwt:
     # Public fixture used ONLY in tests. Never use this key for a running service.
     secret: dGVzdC1vbmx5LWtleS0zMi1ieXRlcy1taW5pbXVtLTEyMzQ1Njc4OTA=

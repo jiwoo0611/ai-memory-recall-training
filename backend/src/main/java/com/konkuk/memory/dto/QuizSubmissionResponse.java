@@ -9,8 +9,15 @@ public record QuizSubmissionResponse(
         int totalCount,
         int correctCount,
         int incorrectCount,
-        List<QuestionResult> results
+        List<QuestionResult> results,
+        TrainingSessionDetailResponse session
 ) {
+    public QuizSubmissionResponse(Long sessionId, int totalCount, int correctCount, int incorrectCount, List<QuestionResult> results) {
+        this(sessionId, totalCount, correctCount, incorrectCount, results, null);
+    }
+    public QuizSubmissionResponse withSession(TrainingSessionDetailResponse session) {
+        return new QuizSubmissionResponse(sessionId, totalCount, correctCount, incorrectCount, results, session);
+    }
     public record QuestionResult(
             Long questionId,
             String content,

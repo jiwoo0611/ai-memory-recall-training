@@ -31,6 +31,11 @@ public class TrainingSession extends BaseEntity {
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public long getVersion() { return version; }
+    public void markCompleted() {
+        if (status != Status.IN_PROGRESS) throw new IllegalStateException("Only an in-progress session can complete");
+        this.status = Status.COMPLETED;
+        this.completedAt = Instant.now();
+    }
     public void markGeneratingQuestions() { this.status = Status.GENERATING_QUESTIONS; }
     public void markInProgress() { this.status = Status.IN_PROGRESS; }
     public void markQuestionGenerationFailed() { this.status = Status.QUESTION_GENERATION_FAILED; }

@@ -13,14 +13,14 @@ import java.util.List;
 public class PhotoDeleteService {
 
     private final PhotoRepository photoRepository;
-    private final FileStorageService fileStorageService;
+    private final StorageDeletionQueue deletionQueue;
 
     public PhotoDeleteService(
             PhotoRepository photoRepository,
-            FileStorageService fileStorageService
+            StorageDeletionQueue deletionQueue
     ) {
         this.photoRepository = photoRepository;
-        this.fileStorageService = fileStorageService;
+        this.deletionQueue = deletionQueue;
     }
 
     // 사진 1장 삭제
@@ -51,7 +51,7 @@ public class PhotoDeleteService {
         photoRepository.delete(photo);
         photoRepository.flush();
 
-        fileStorageService.delete(storageKey);
+        deletionQueue.enqueue(storageKey);
     }
 
     // 선택한 사진 여러 장 삭제
@@ -80,7 +80,7 @@ public class PhotoDeleteService {
             photoRepository.delete(photo);
             photoRepository.flush();
 
-            fileStorageService.delete(storageKey);
+            deletionQueue.enqueue(storageKey);
         }
     }
 }

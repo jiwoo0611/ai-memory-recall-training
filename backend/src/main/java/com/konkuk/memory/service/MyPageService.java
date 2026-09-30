@@ -45,10 +45,19 @@ public class MyPageService {
     }
 
     public PageResponse<TrainingSessionSummaryResponse> trainingSessions(Long currentUserId, int page, int size) {
+        return trainingSessions(currentUserId, page, size, null);
+    }
+
+    public PageResponse<TrainingSessionSummaryResponse> trainingSessions(Long currentUserId, int page, int size, Long photoId) {
         var pageable = pageRequest(page, size, "startedAt");
         users.requireCurrentUser(currentUserId);
-        return PageResponse.from(sessions.findAllByPhoto_User_Id(currentUserId, pageable)
-                .map(TrainingSessionSummaryResponse::from));
+        if (photoId != null) photos.findByIdAndUser_Id(photoId, currentUserId).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "PHOTO_NOT_FOUND", "사진을 찾을 수 없습니다."));
+        var pageOfSessions = photoId == null ? sessions.findAllByPhoto_User_Id(currentUserId, pageable)
+                : sessions.findAllByPhoto_IdAndPhoto_User_Id(photoId, currentUserId, pageable);
+        var bySession = results.findAllByTrainingSessionIn(pageOfSessions.getContent()).stream()
+                .collect(Collectors.toMap(r -> r.getTrainingSession().getId(), Function.identity()));
+        return PageResponse.from(pageOfSessions.map(s -> TrainingSessionSummaryResponse.from(s, bySession.get(s.getId()))));
     }
 
     public TrainingSessionDetailResponse trainingSession(Long currentUserId, Long sessionId) {

@@ -260,6 +260,7 @@ class MyPageIntegrationTest {
 
     @Test void responsesNeverExposeInternalFieldsOrOtherUsersContent() throws Exception {
         for (String path : paths()) {
+            if (path.endsWith("/image")) continue; // Binary image response is verified by the image endpoint tests.
             String body = ownGet(path).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
             assertSafe(mapper.readTree(body));
             assertThat(body).doesNotContain("private/", "fixture-hash", "다른 사용자 비공개 답변", "other.jpg");

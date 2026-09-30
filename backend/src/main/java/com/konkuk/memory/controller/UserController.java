@@ -15,10 +15,13 @@ public class UserController {
     private final UserService users;
     private final MyPageService myPage;
     private final QuizSubmissionService quizSubmission;
-    public UserController(UserService users, MyPageService myPage, QuizSubmissionService quizSubmission) {
+    private final com.konkuk.memory.service.RecallFeedbackService feedback;
+    public UserController(UserService users, MyPageService myPage, QuizSubmissionService quizSubmission,
+                          com.konkuk.memory.service.RecallFeedbackService feedback) {
         this.users = users;
         this.myPage = myPage;
         this.quizSubmission = quizSubmission;
+        this.feedback = feedback;
     }
 
     @GetMapping("/me")
@@ -34,8 +37,9 @@ public class UserController {
 
     @GetMapping("/me/training-sessions")
     public PageResponse<TrainingSessionSummaryResponse> trainingSessions(@AuthenticationPrincipal Jwt jwt,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return myPage.trainingSessions(Long.valueOf(jwt.getSubject()), page, size);
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long photoId) {
+        return myPage.trainingSessions(Long.valueOf(jwt.getSubject()), page, size, photoId);
     }
 
     @GetMapping("/me/training-sessions/{sessionId}")
@@ -48,6 +52,15 @@ public class UserController {
             @PathVariable Long sessionId,
             @Valid @RequestBody QuizSubmissionRequest request
     ) {
-        return quizSubmission.submit(Long.valueOf(jwt.getSubject()), sessionId, request);
+        Long userId = Long.valueOf(jwt.getSubject());
+        var score = quizSubmission.submit(userId, sessionId, request);
+        // submit() has committed before this separate proxied service starts feedback.
+        try {
+            feedback.generate(userId, sessionId);
+        } catch (RuntimeException ex) {
+            org.slf4j.LoggerFactory.getLogger(UserController.class)
+                    .warn("Quiz answers committed; feedback transaction failed for session {}", sessionId);
+        }
+        return score.withSession(myPage.trainingSession(userId, sessionId));
     }
 }

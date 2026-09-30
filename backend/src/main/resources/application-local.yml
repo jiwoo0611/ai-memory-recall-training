@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:./local-data/memory;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  jpa:
+    properties:
+      hibernate:
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+server:
+  address: 127.0.0.1
+  port: 18080
+app:
+  storage:
+    mode: local
+    directory: ./uploads
+  jwt:
+    # Public local-only key. This profile binds to loopback and must never be deployed.
+    secret: bG9jYWwtb25seS1tZW1vcnktcmVjYWxsLWRldi1rZXktMzJieXRlcw==
+    issuer: memory-recall-local
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173

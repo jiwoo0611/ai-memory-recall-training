@@ -14,6 +14,8 @@ public class Answer extends BaseEntity {
     private Status status;
     @Column(columnDefinition = "TEXT")
     private String content;
+    private Integer selectedOptionIndex;
+    private Boolean correct;
 
     protected Answer() {}
     public Answer(Question question, Status status, String content) {
@@ -24,4 +26,12 @@ public class Answer extends BaseEntity {
     public Question getQuestion() { return question; }
     public Status getStatus() { return status; }
     public String getContent() { return content; }
+    public Integer getSelectedOptionIndex() { return selectedOptionIndex; }
+    public Boolean getCorrect() { return correct; }
+    public static Answer quiz(Question question, int selectedIndex, String selectedOption, boolean correct) {
+        Answer answer = new Answer(question, Status.ANSWERED, selectedOption);
+        answer.selectedOptionIndex = selectedIndex;
+        answer.correct = correct;
+        return answer;
+    }
 }

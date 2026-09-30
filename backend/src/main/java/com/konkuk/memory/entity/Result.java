@@ -20,6 +20,9 @@ public class Result extends BaseEntity {
     private int cannotRecallCount;
     @Column(nullable = false)
     private int mismatchCount;
+    private Integer totalCount;
+    private Integer correctCount;
+    private Integer incorrectCount;
     @Column(length = 100)
     private String generationVersion;
     @Version
@@ -36,4 +39,28 @@ public class Result extends BaseEntity {
     public int getMismatchCount() { return mismatchCount; }
     public String getGenerationVersion() { return generationVersion; }
     public long getVersion() { return version; }
+    public Integer getTotalCount() { return totalCount; }
+    public Integer getCorrectCount() { return correctCount; }
+    public Integer getIncorrectCount() { return incorrectCount; }
+    public void recordQuizScore(int total, int correct) {
+        if (total < 1 || correct < 0 || correct > total) throw new IllegalArgumentException("Invalid quiz score");
+        this.totalCount = total;
+        this.answeredCount = total;
+        this.correctCount = correct;
+        this.incorrectCount = total - correct;
+    }
+    public void startFeedback() { this.feedbackStatus = FeedbackStatus.PROCESSING; }
+    public void completeQuizFeedback(String summary) {
+        this.summary = summary;
+        this.feedbackStatus = FeedbackStatus.COMPLETED;
+        this.generationVersion = "quiz-rules-v1";
+    }
+    public void setCounts(int answered, int cannotRecall, int mismatch) {
+        this.answeredCount = answered; this.cannotRecallCount = cannotRecall; this.mismatchCount = mismatch;
+    }
+    public void completeFeedback(String summary) {
+        this.summary = summary; this.feedbackStatus = FeedbackStatus.COMPLETED;
+        this.generationVersion = "extractive-recall-v1";
+    }
+    public void failFeedback() { this.feedbackStatus = FeedbackStatus.FAILED; }
 }

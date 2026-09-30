@@ -32,3 +32,9 @@ out/
 ### VS Code ###
 .vscode/
 backend/.env
+**/local-data/
+**/uploads/
+**/test-results/
+**/playwright-report/
+**/.env.local
+**/local-logs/

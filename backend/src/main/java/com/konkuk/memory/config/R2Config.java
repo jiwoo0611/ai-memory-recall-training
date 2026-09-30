@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import java.net.URI;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.storage.mode", havingValue = "r2", matchIfMissing = true)
 public class R2Config {
 
     @Bean

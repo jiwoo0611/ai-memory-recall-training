@@ -91,11 +91,16 @@ class DatabaseIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    @Test void deletingPhotoWithHistoryIsPrevented() {
+    @Test void deletingPhotoCascadesToItsHistory() {
         var photo = photo(owner("delete@example.com"));
-        sessions.saveAndFlush(new TrainingSession(photo));
-        // Direct SQL proves the FK protects history independently of JPA's in-memory checks.
-        assertThatThrownBy(() -> jdbc.update("DELETE FROM photos WHERE id = ?", photo.getId()))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        var session = sessions.saveAndFlush(new TrainingSession(photo));
+        var q = question(session);
+        answers.saveAndFlush(new Answer(q, Answer.Status.CANNOT_RECALL, null));
+        results.saveAndFlush(new Result(session));
+        jdbc.update("DELETE FROM photos WHERE id = ?", photo.getId());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM training_sessions WHERE id=?", Integer.class, session.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM questions WHERE id=?", Integer.class, q.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM answers WHERE question_id=?", Integer.class, q.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM results WHERE training_session_id=?", Integer.class, session.getId())).isZero();
     }
 }
