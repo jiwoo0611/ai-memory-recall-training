@@ -67,6 +67,26 @@ function LoadState({ state, children }) {
   return children(state.data);
 }
 
+function GrowthStats({ state }) {
+  return <LoadState state={state}>{(data) => {
+    const rows = data.content.filter(x => x.result?.correctCount != null).slice().reverse();
+    const total = rows.reduce((n, x) => n + x.result.totalCount, 0);
+    const correct = rows.reduce((n, x) => n + x.result.correctCount, 0);
+    const rate = total ? Math.round(correct / total * 100) : 0;
+    const level = Math.max(1, Math.floor(correct / 10) + 1);
+    const progress = (correct % 10) * 10;
+    const stages = ["🌱", "🌿", "🌳", "✨🌳"];
+    return <section className="card growth-stats" aria-labelledby="growth-title">
+      <div className="section-heading"><div><p className="eyebrow">MY TRAINING JOURNEY</p><h2 id="growth-title">나의 성장 기록</h2></div><span className="growth-level">Lv. {level} {stages[Math.min(stages.length - 1, Math.floor((level - 1) / 3))]}</span></div>
+      <p className="muted">저장된 훈련 기록 기준으로 계산한 통계입니다.</p>
+      <div className="growth-metrics"><strong>평균 정답률 {rate}%</strong><span>총 {rows.length}회 훈련 · {correct}문항 정답</span></div>
+      <div className="growth-progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100"><span style={{width: `${progress}%`}} /></div>
+      <p className="muted">다음 레벨까지 {10 - (correct % 10)}문항 남았습니다.</p>
+      {rows.length ? <div className="growth-chart" aria-label="날짜별 정답률">{rows.slice(-7).map(item => <div className="growth-bar" key={item.id}><span style={{height: `${Math.max(8, item.result.correctCount / item.result.totalCount * 100)}%`}} /><small>{new Date(item.startedAt).toLocaleDateString("ko-KR", {month:"numeric", day:"numeric"})}</small></div>)}</div> : <Empty>결과가 저장되면 성장 기록이 시작됩니다.</Empty>}
+    </section>;
+  }}</LoadState>;
+}
+
 function SessionDetail({ id, onClose }) {
   const section = useRef(null);
 
@@ -280,6 +300,7 @@ export default function MyPage({ albumId }) {
     },
     "recent",
   );
+  const stats = useLoad((signal) => api.sessions(0, signal, 100), "growth-stats");
 
   return (
     <>
@@ -351,6 +372,7 @@ export default function MyPage({ albumId }) {
           )}
         </LoadState>
       </section>
+      <GrowthStats state={stats} />
 
       <div className="dashboard">
         <div className="main-column">

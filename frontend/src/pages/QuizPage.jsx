@@ -175,16 +175,22 @@ export default function QuizPage({ albumId, sessionId }) {
         <h1>회상 퀴즈 결과</h1>
         <p>{session.photo.originalFilename} · <Badge value={session.status} /></p>
         <p className="muted">시작 {date(session.startedAt)} · 완료 {date(session.completedAt)}</p>
-        <div className="quiz-score-summary">
+        <div className="quiz-result-hero">
+          <div className="quiz-result-stars" aria-label={`${Math.max(1, Math.round(scoreResult.correctCount / scoreResult.totalCount * 3))}개 별 달성`}>
+            {[0, 1, 2].map(star => <span key={star} className={star < Math.round(scoreResult.correctCount / scoreResult.totalCount * 3) ? "earned" : ""}>★</span>)}
+          </div>
+          <p className="quiz-result-celebration">오늘의 퀴즈를 완주했어요!</p>
+          <div className="quiz-score-summary">
           <strong>{scoreResult.correctCount} / {scoreResult.totalCount}</strong>
           <span>{percentage}점</span>
-          <p>{scoreResult.incorrectCount}개 문제를 다시 확인해보세요.</p>
-          <p>응답 {scoreResult.answeredCount} / {scoreResult.totalCount}문항</p>
+          <p>{scoreResult.totalCount}문항에 모두 답했고 {scoreResult.correctCount}문항을 맞혔어요.</p>
+          </div>
+          <div className="quiz-result-reward"><strong>+{scoreResult.correctCount * 10} XP</strong><span>다음 레벨을 향해 한 걸음 더!</span></div>
         </div>
 
         {questionResults.length ? (
-          <section className="wrong-answer-section">
-            <h2>질문별 답변</h2>
+          <details className="wrong-answer-section quiz-review-details">
+            <summary>다시 확인할 문항 {scoreResult.incorrectCount}개</summary>
             <div className="wrong-answer-list">
               {questionResults.map((item, index) => (
                 <article className="wrong-answer-card quiz-review-target" key={item.questionId}
@@ -208,17 +214,14 @@ export default function QuizPage({ albumId, sessionId }) {
                 </article>
               ))}
             </div>
-          </section>
+          </details>
         ) : (
           <p className="all-correct-message">모든 문제를 맞혔습니다.</p>
         )}
 
         <section className="recall-feedback quiz-feedback" aria-labelledby="quiz-feedback-title">
           <h2 id="quiz-feedback-title">훈련 피드백</h2>
-          <p className="quiz-feedback-summary">
-            {scoreResult.totalCount}문항에 모두 답했고, 저장된 정답과 일치한 답변은 {scoreResult.correctCount}개입니다.
-            {reviewQuestions.length > 0 ? ` 나머지 ${reviewQuestions.length}문항을 다시 확인해보세요.` : " 다시 확인할 오답은 없습니다."}
-          </p>
+          <p className="quiz-feedback-summary">저장된 훈련 기록 기준으로 정답률 {percentage}%를 기록했어요.</p>
           {reviewQuestions.length > 0 && <div className="quiz-feedback-cards">
             {reviewQuestions.map(q => <article className="quiz-feedback-card" key={q.id}>
               <h3>질문 {q.questionOrder} · 다시 확인하기</h3>
