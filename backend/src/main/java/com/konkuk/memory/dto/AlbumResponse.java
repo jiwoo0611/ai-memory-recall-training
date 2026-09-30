@@ -7,13 +7,15 @@ import java.time.Instant;
 public record AlbumResponse(
         Long id,
         String title,
-        Instant createdAt
+        Instant createdAt,
+        long photoCount
 ) {
-    public static AlbumResponse from(Album album){
+    public static AlbumResponse from(Album album, long photoCount){
         return new AlbumResponse(
                 album.getId(),
                 album.getTitle(),
-                album.getCreatedAt()
+                album.getCreatedAt(),
+                photoCount
         );
     }
 }

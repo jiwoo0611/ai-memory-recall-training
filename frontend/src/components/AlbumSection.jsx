@@ -650,7 +650,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
           </Empty>
         ) : (
           <div className="photo-grid">
-            {albumPhotos.map((photo) => {
+            {albumPhotos.map((photo, index) => {
               const isSelected =
                 selectedPhotoIds.includes(photo.id);
 
@@ -709,11 +709,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
                         photo={photo}
                       />
 
-                      <h3>
-                        {
-                          photo.originalFilename
-                        }
-                      </h3>
+                      <h3>사진{index+1}</h3>
 
                       <p className="muted">
                         {photo.contentType} ·{" "}
@@ -758,11 +754,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
                           photo={photo}
                         />
 
-                        <h3>
-                          {
-                            photo.originalFilename
-                          }
-                        </h3>
+                        <h3>사진{index+1}</h3>
 
                         <p className="muted">
                           {photo.contentType} ·{" "}
@@ -1087,7 +1079,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
                 </div>
 
                 <h3>
-                  {album.title}
+                  {album.photoCount ?? 0}장
                 </h3>
 
                 <p className="muted">

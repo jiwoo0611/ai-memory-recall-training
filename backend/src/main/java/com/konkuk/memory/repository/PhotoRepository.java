@@ -12,4 +12,6 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
     Optional<Photo> findByIdAndAlbum_IdAndUser_Id(Long photoId, Long albumId, Long userId);
     Page<Photo> findAllByUser_Id(Long userId, Pageable pageable);
     List<Photo> findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(Long albumId, Long userId);
+
+    long countByAlbum_IdAndUser_Id(Long albumId, Long userId);
 }

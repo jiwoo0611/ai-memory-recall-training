@@ -41,7 +41,8 @@ public class AlbumService {
             Long userId,
             AlbumCreateRequest request
     ) {
-        User user = userRepository.findById(userId)
+        User user = userRepository
+                .findById(userId)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "USER_NOT_FOUND",
@@ -51,14 +52,12 @@ public class AlbumService {
         String title = request.title().trim();
 
         Album album = new Album(user, title);
-
         Album savedAlbum = albumRepository.save(album);
 
-        return AlbumResponse.from(savedAlbum);
+        return AlbumResponse.from(savedAlbum, 0);
     }
 
     public List<AlbumResponse> getAlbums(Long userId) {
-
         if (!userRepository.existsById(userId)) {
             throw new ApiException(
                     HttpStatus.NOT_FOUND,
@@ -70,7 +69,13 @@ public class AlbumService {
         return albumRepository
                 .findAllByUser_IdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(AlbumResponse::from)
+                .map(album -> AlbumResponse.from(
+                        album,
+                        photoRepository.countByAlbum_IdAndUser_Id(
+                                album.getId(),
+                                userId
+                        )
+                ))
                 .toList();
     }
 
@@ -86,7 +91,13 @@ public class AlbumService {
                         "앨범을 찾을 수 없습니다."
                 ));
 
-        return AlbumResponse.from(album);
+        long photoCount =
+                photoRepository.countByAlbum_IdAndUser_Id(
+                        albumId,
+                        userId
+                );
+
+        return AlbumResponse.from(album, photoCount);
     }
 
     @Transactional
@@ -107,7 +118,13 @@ public class AlbumService {
 
         album.changeTitle(trimmedTitle);
 
-        return AlbumResponse.from(album);
+        long photoCount =
+                photoRepository.countByAlbum_IdAndUser_Id(
+                        albumId,
+                        userId
+                );
+
+        return AlbumResponse.from(album, photoCount);
     }
 
     @Transactional
@@ -131,9 +148,7 @@ public class AlbumService {
                         );
 
         for (Photo photo : photos) {
-            fileStorageService.delete(
-                    photo.getStorageKey()
-            );
+            fileStorageService.delete(photo.getStorageKey());
         }
 
         photoRepository.deleteAll(photos);
