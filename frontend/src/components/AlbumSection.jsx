@@ -1079,8 +1079,12 @@ const handleUpdateAlbumTitle = async (event, album) => {
                 </div>
 
                 <h3>
-                  {album.photoCount ?? 0}장
+                  {album.title}
                 </h3>
+
+                <p className="muted">
+                    {album.photoCount ?? 0}장
+                </p>
 
                 <p className="muted">
                   생성일{" "}
