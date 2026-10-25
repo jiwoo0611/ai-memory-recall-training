@@ -1,5 +1,52 @@
+<div align="center">
+
 # 기억산책
-개인 사진과 촬영 정보를 바탕으로 질문을 만들고, 답변과 훈련 결과를 기록하는 사진 기반 기억 회상 서비스입니다.
+
+### 사진 속 순간을, 나의 이야기로
+
+개인 사진으로 질문을 만들고, 답변과 훈련 기록을 차곡차곡 쌓아가는 기억 회상 서비스
+
+**[서비스 체험하기](https://graduation-project-1-08z0.onrender.com/#/login)** · **[화면 미리보기](#화면-미리보기)** · **[실행 방법](#빠른-시작--windows-로컬-체험)** · **[문서](docs/README.md)**
+
+`React 19` · `Spring Boot 3.5` · `MySQL` · `Gemini`
+
+</div>
+
+---
+
+## 서비스 체험
+
+[배포 사이트에서 시작하기 →](https://graduation-project-1-08z0.onrender.com/#/login)
+
+| 테스트 계정 | 입력값 |
+| --- | --- |
+| 이메일 | `test@1234.com` |
+| 비밀번호 | `12345678` |
+
+## 화면 미리보기
+
+배포 사이트에서 직접 캡처한 화면입니다. (2026-10-25)
+
+<table>
+<tr>
+<th width="50%">01 · 시작 화면</th>
+<th width="50%">02 · 로그인</th>
+</tr>
+<tr>
+<td><img src="assets/screenshots/home.png" alt="기억산책 홈 화면 — 사진에 담긴 순간, 나의 이야기로 이어가요" width="100%"></td>
+<td><img src="assets/screenshots/login.png" alt="기억산책 로그인 화면" width="100%"></td>
+</tr>
+<tr>
+<td align="center">서비스 소개와 시작 안내</td>
+<td align="center">테스트 계정으로 서비스 체험</td>
+</tr>
+</table>
+
+## 사용 흐름
+
+**로그인 → 사진·앨범 선택 → 질문 생성 → 회상 훈련 → 결과·이력 확인**
+
+사진과 촬영 정보에서 회상 단서를 찾고, 질문과 답변을 훈련 이력으로 남깁니다. 다시 풀기는 새 훈련을 만들어 이전 기록과 함께 확인할 수 있습니다.
 
 ## 주요 기능
 
@@ -52,7 +99,7 @@ cd graduation_project
 
 - 화면: http://localhost:5173/#/login
 - API: http://127.0.0.1:18080
-- 체험 계정: `demo@example.com` / `DemoPass123!`
+- 로컬 자동 생성 계정: `demo@example.com` / `DemoPass123!` (위 배포 사이트 테스트 계정과 별개)
 - 종료: `.\Stop-Local.ps1`
 - 소스 변경 없이 다시 실행: `.\Start-Local.ps1 -SkipBuild`
 

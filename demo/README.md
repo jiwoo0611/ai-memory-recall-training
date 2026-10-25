@@ -1,4 +1,15 @@
-# 로컬 체험 · 시연
+# 서비스 체험 · 시연
+
+## 배포 사이트
+
+[기억산책 로그인](https://graduation-project-1-08z0.onrender.com/#/login)
+
+| 이메일 | 비밀번호 |
+| --- | --- |
+| `test@1234.com` | `12345678` |
+
+배포 화면 캡처는 [프로젝트 소개](../README.md#화면-미리보기)에서 확인할 수 있습니다.
+
 
 ## 실행
 
@@ -10,7 +21,7 @@ Windows PowerShell에서 저장소 루트 기준으로 실행합니다. JDK 17�
 
 화면은 http://localhost:5173/#/login, API는 http://127.0.0.1:18080 입니다. 서버 시작에 시간이 걸릴 수 있으며 로그는 `local-logs/`에 기록됩니다.
 
-체험 계정: `demo@example.com` / `DemoPass123!`
+로컬 자동 생성 계정: `demo@example.com` / `DemoPass123!` (배포 사이트의 테스트 계정과 별개)
 
 ## 시연 순서
 
@@ -31,4 +42,4 @@ Windows PowerShell에서 저장소 루트 기준으로 실행합니다. JDK 17�
 
 `-SkipBuild`는 기존 빌드와 설치된 프론트엔드 의존성을 재사용합니다. 소스를 수정했거나 처음 실행하는 경우 기본 실행 명령을 사용합니다. 종료 후에도 H2 파일 DB와 업로드 이미지는 보존됩니다.
 
-시연 영상과 캡처가 준비되면 [assets](../assets/README.md)에 추가하고 여기에서 연결합니다. 세부 동작은 [회상 훈련 문서](../backend/docs/RECALL.md)를 참고하세요.
+배포 사이트의 홈·로그인 화면 캡처는 [assets](../assets/README.md)에 정리했습니다. 시연 영상은 준비되면 추가합니다. 세부 동작은 [회상 훈련 문서](../backend/docs/RECALL.md)를 참고하세요.

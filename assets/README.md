@@ -1,7 +1,14 @@
 # 이미지 · 시각 자료
 
-프로젝트 소개와 발표에 사용하는 화면 캡처, 구조도, 데모 이미지를 정리하는 공간입니다.
+## 배포 화면 캡처
 
-자료가 생기면 `screenshots/`, `diagrams/`, `demo/`로 구분하고, README에서는 상대 경로로 연결합니다. 현재 이 폴더에는 안내 문서만 있습니다.
+2026-10-25에 [배포 사이트](https://graduation-project-1-08z0.onrender.com/#/login)에서 직접 캡처했습니다.
 
-캡처에는 체험용 데이터를 사용하고 개인 사진·계정 정보·토큰·API 키가 노출되지 않도록 확인합니다. 프론트엔드 실행에 필요한 자산은 `frontend/`에서 관리합니다.
+| 화면 | 파일 |
+| --- | --- |
+| 홈 | [home.png](screenshots/home.png) |
+| 로그인 | [login.png](screenshots/login.png) |
+
+[루트 README](../README.md#화면-미리보기)에서 두 화면을 함께 볼 수 있습니다. 캡처는 당시 배포 화면이며 이후 UI와 달라질 수 있습니다.
+
+추가 화면 캡처는 `screenshots/`, 구조도는 `diagrams/`, 시연 영상은 `demo/`로 분류합니다. 프론트엔드 실행에 필요한 자산은 `frontend/`에서 관리합니다.
