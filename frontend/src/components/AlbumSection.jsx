@@ -8,6 +8,20 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("ko-KR");
 }
 
+function hasQuestionSuitability(aiClues) {
+  if (!aiClues?.trim()) return false;
+
+  try {
+    const parsed = JSON.parse(aiClues);
+    return (
+      Number.isFinite(parsed.questionSuitability?.score) &&
+      Boolean(parsed.questionSuitability?.sceneKey?.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function AlbumSection({ albumId }) {
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -351,7 +365,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
       let updatedPhotos = albumPhotos;
 
       const photosToAnalyze = updatedPhotos.filter(
-        (photo) => !photo.aiClues?.trim(),
+        (photo) => !hasQuestionSuitability(photo.aiClues),
       );
 
       const alreadyAnalyzedCount =
@@ -385,7 +399,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
       }
 
       setQuestionGenerationNotice(
-        `사진 AI 분석 완료 (${updatedPhotos.length}/${updatedPhotos.length}) · 객관식 질문 생성 중…`,
+        `사진 AI 분석 완료 (${updatedPhotos.length}/${updatedPhotos.length}) · 질문에 적합한 장면 선별 중…`,
       );
 
       const generatedSession =

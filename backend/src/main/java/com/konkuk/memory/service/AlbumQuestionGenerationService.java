@@ -11,6 +11,7 @@ public class AlbumQuestionGenerationService {
     private static final int MAX_QUESTIONS = 13;
 
     private final AlbumPhotoAnalysisService albumPhotoAnalysisService;
+    private final AlbumQuestionReadinessService readinessService;
     private final AlbumQuestionContextService contextService;
     private final GeminiQuestionGenerationClient geminiClient;
     private final LocationQuestionFactory locationQuestionFactory;
@@ -20,6 +21,7 @@ public class AlbumQuestionGenerationService {
 
     public AlbumQuestionGenerationService(
             AlbumPhotoAnalysisService albumPhotoAnalysisService,
+            AlbumQuestionReadinessService readinessService,
             AlbumQuestionContextService contextService,
             GeminiQuestionGenerationClient geminiClient,
             LocationQuestionFactory locationQuestionFactory,
@@ -28,6 +30,7 @@ public class AlbumQuestionGenerationService {
             MyPageService myPageService
     ) {
         this.albumPhotoAnalysisService = albumPhotoAnalysisService;
+        this.readinessService = readinessService;
         this.contextService = contextService;
         this.geminiClient = geminiClient;
         this.locationQuestionFactory = locationQuestionFactory;
@@ -38,7 +41,10 @@ public class AlbumQuestionGenerationService {
 
     public TrainingSessionDetailResponse generate(Long userId, Long albumId) {
         albumPhotoAnalysisService.ensureComplete(userId, albumId);
-        AlbumQuestionContextService.AlbumQuestionContext context = contextService.build(userId, albumId);
+        AlbumQuestionReadinessService.Readiness readiness =
+                readinessService.requireReady(userId, albumId);
+        AlbumQuestionContextService.AlbumQuestionContext context =
+                contextService.build(userId, albumId, readiness.eligiblePhotoIds());
         Long sessionId = persistenceService.start(userId, context.albumId(), context.anchorPhotoId());
 
         try {

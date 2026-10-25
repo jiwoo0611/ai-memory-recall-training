@@ -35,6 +35,13 @@ class GeminiPhotoAnalysisClientTest {
                   "visibleText": [],
                   "questionClues": ["이날 함께 먹은 음식"],
                   "uncertainties": ["정확한 식당 위치는 알 수 없음"],
+                  "questionSuitability": {
+                    "score": 82,
+                    "quality": "GOOD",
+                    "sceneKey": "김치찌개 식사",
+                    "usableTopics": ["food", "timeline"],
+                    "exclusionReasons": []
+                  },
                   "ignored": "저장하지 않을 값"
                 }
                 """;
@@ -57,6 +64,10 @@ class GeminiPhotoAnalysisClientTest {
                 .isEqualTo("HIGH");
         assertThat(stored.path("questionClues").path(0).asText())
                 .isEqualTo("이날 함께 먹은 음식");
+        assertThat(stored.path("questionSuitability").path("score").asInt())
+                .isEqualTo(82);
+        assertThat(stored.path("questionSuitability").path("sceneKey").asText())
+                .isEqualTo("김치찌개 식사");
         assertThat(stored.path("provider").asText())
                 .isEqualTo("google-gemini");
         assertThat(stored.path("model").asText())

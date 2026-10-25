@@ -46,14 +46,23 @@ public class AlbumQuestionContextService {
     }
 
     public AlbumQuestionContext build(Long userId, Long albumId) {
+        return build(userId, albumId, null);
+    }
+
+    public AlbumQuestionContext build(Long userId, Long albumId, Set<Long> allowedPhotoIds) {
         Album album = albumRepository.findByIdAndUser_Id(albumId, userId)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "ALBUM_NOT_FOUND",
                         "앨범을 찾을 수 없습니다."
                 ));
-        List<Photo> photos = photoRepository
+        List<Photo> allPhotos = photoRepository
                 .findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(albumId, userId);
+        List<Photo> photos = allowedPhotoIds == null
+                ? allPhotos
+                : allPhotos.stream()
+                .filter(photo -> allowedPhotoIds.contains(photo.getId()))
+                .toList();
 
         if (photos.isEmpty()) {
             throw new ApiException(

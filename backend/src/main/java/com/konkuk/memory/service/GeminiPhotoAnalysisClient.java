@@ -46,15 +46,21 @@ public class GeminiPhotoAnalysisClient {
             유명 랜드마크나 대표 건축물이 장면의 중심에 있고 외형으로 식별 가능하면 landmarks에 이름, 소재 지역, confidence를 적으세요.
             랜드마크의 region은 서울특별시, 경기도, 부산광역시처럼 대한민국 공식 시·도 1단계 명칭으로 적으세요.
             일반 건물이나 확실하지 않은 건축물을 유명 장소로 추측하지 말고 LOW로 표시하거나 제외하세요.
+            questionSuitability에는 이 사진이 회상 객관식 질문의 근거로 얼마나 유용한지 평가하세요.
+            score는 0~100점으로, 대표 활동·음식·음료·랜드마크처럼 기억할 사건이 선명하면 높게 평가하세요.
+            흐림·과도한 어두움·스크린샷·문서·상표 중심·무엇인지 알기 어려운 사진은 낮게 평가하세요.
+            sceneKey는 비슷한 연속 사진을 같은 장면으로 묶을 수 있도록 '모닥불 감상', '저녁 식사'처럼 짧고 일반적인 사건명으로 작성하세요.
+            usableTopics에는 activity, food, drink, landmark, color, timeline 중 실제로 질문에 쓸 수 있는 항목만 적으세요.
+            exclusionReasons에는 낮은 점수의 원인을 짧게 적고, 문제가 없으면 빈 배열로 두세요.
             불확실한 내용은 단정하지 말고 uncertainties에 적으세요.
             모든 문자열은 한국어로 작성하세요.
             """;
 
     private static final Map<String, Object> RESPONSE_SCHEMA = Map.of(
             "type", "object",
-            "properties", Map.of(
-                    "summary", Map.of("type", "string"),
-                    "foods", Map.of(
+            "properties", Map.ofEntries(
+                    Map.entry("summary", Map.of("type", "string")),
+                    Map.entry("foods", Map.of(
                             "type", "array",
                             "items", Map.of(
                                     "type", "object",
@@ -67,8 +73,8 @@ public class GeminiPhotoAnalysisClient {
                                     ),
                                     "required", List.of("name", "confidence")
                             )
-                    ),
-                    "landmarks", Map.of(
+                    )),
+                    Map.entry("landmarks", Map.of(
                             "type", "array",
                             "items", Map.of(
                                     "type", "object",
@@ -82,14 +88,31 @@ public class GeminiPhotoAnalysisClient {
                                     ),
                                     "required", List.of("name", "region", "confidence")
                             )
-                    ),
-                    "objects", stringArraySchema(),
-                    "scene", Map.of("type", "string"),
-                    "activities", stringArraySchema(),
-                    "peopleCount", Map.of("type", "integer"),
-                    "visibleText", stringArraySchema(),
-                    "questionClues", stringArraySchema(),
-                    "uncertainties", stringArraySchema()
+                    )),
+                    Map.entry("objects", stringArraySchema()),
+                    Map.entry("scene", Map.of("type", "string")),
+                    Map.entry("activities", stringArraySchema()),
+                    Map.entry("peopleCount", Map.of("type", "integer")),
+                    Map.entry("visibleText", stringArraySchema()),
+                    Map.entry("questionClues", stringArraySchema()),
+                    Map.entry("uncertainties", stringArraySchema()),
+                    Map.entry("questionSuitability", Map.of(
+                            "type", "object",
+                            "properties", Map.of(
+                                    "score", Map.of("type", "integer"),
+                                    "quality", Map.of(
+                                            "type", "string",
+                                            "enum", List.of("GOOD", "USABLE", "POOR")
+                                    ),
+                                    "sceneKey", Map.of("type", "string"),
+                                    "usableTopics", stringArraySchema(),
+                                    "exclusionReasons", stringArraySchema()
+                            ),
+                            "required", List.of(
+                                    "score", "quality", "sceneKey",
+                                    "usableTopics", "exclusionReasons"
+                            )
+                    ))
             ),
             "required", List.of(
                     "summary",
@@ -101,7 +124,8 @@ public class GeminiPhotoAnalysisClient {
                     "peopleCount",
                     "visibleText",
                     "questionClues",
-                    "uncertainties"
+                    "uncertainties",
+                    "questionSuitability"
             )
     );
 
@@ -303,11 +327,27 @@ public class GeminiPhotoAnalysisClient {
         copyStringArray(source, stored, "visibleText");
         copyStringArray(source, stored, "questionClues");
         copyStringArray(source, stored, "uncertainties");
+        copyQuestionSuitability(source, stored);
         stored.put("provider", PROVIDER);
         stored.put("model", model);
         stored.put("analyzedAt", Instant.now().toString());
 
         return objectMapper.writeValueAsString(stored);
+    }
+
+    private void copyQuestionSuitability(JsonNode source, ObjectNode target) {
+        JsonNode input = source.path("questionSuitability");
+        ObjectNode output = target.putObject("questionSuitability");
+        output.put("score", Math.max(0, Math.min(100, input.path("score").asInt(0))));
+
+        String quality = input.path("quality").asText("POOR").toUpperCase();
+        if (!Set.of("GOOD", "USABLE", "POOR").contains(quality)) {
+            quality = "POOR";
+        }
+        output.put("quality", quality);
+        output.put("sceneKey", cleanText(input.path("sceneKey").asText("")));
+        copyStringArray(input, output, "usableTopics");
+        copyStringArray(input, output, "exclusionReasons");
     }
 
     private void copyStringArray(
