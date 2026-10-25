@@ -20,6 +20,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -215,6 +216,24 @@ public class GeminiQuestionGenerationClient {
             int maxQuestions,
             int candidateQuestions
     ) {
+        return generate(
+                evidenceJson,
+                allowedPhotoIds,
+                minQuestions,
+                maxQuestions,
+                candidateQuestions,
+                null
+        );
+    }
+
+    public List<GeneratedQuestion> generate(
+            String evidenceJson,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions,
+            DifficultyQuota difficultyQuota
+    ) {
         if (apiKey.isBlank()) {
             throw new ApiException(
                     HttpStatus.SERVICE_UNAVAILABLE,
@@ -223,11 +242,13 @@ public class GeminiQuestionGenerationClient {
             );
         }
         validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
+        validateDifficultyQuota(difficultyQuota, minQuestions, maxQuestions);
 
         String requestPrompt = PROMPT
                 + "\n이번 응답에는 서로 다른 후보 질문을 " + candidateQuestions + "개 생성하세요."
                 + " 서버가 그중 품질이 높은 " + minQuestions + "~" + maxQuestions
                 + "개를 선택하므로 같은 정답이나 장면을 반복하지 마세요."
+                + difficultyInstruction(difficultyQuota)
                 + "\n\n앨범 사진 통합 근거 JSON:\n"
                 + evidenceJson;
 
@@ -255,7 +276,8 @@ public class GeminiQuestionGenerationClient {
                         allowedPhotoIds,
                         minQuestions,
                         maxQuestions,
-                        candidateQuestions
+                        candidateQuestions,
+                        difficultyQuota
                 );
             } catch (JsonProcessingException ex) {
                 lastInvalidResponse = invalidResponse();
@@ -333,7 +355,26 @@ public class GeminiQuestionGenerationClient {
             int maxQuestions,
             int candidateQuestions
     ) throws JsonProcessingException {
+        return normalize(
+                output,
+                allowedPhotoIds,
+                minQuestions,
+                maxQuestions,
+                candidateQuestions,
+                null
+        );
+    }
+
+    List<GeneratedQuestion> normalize(
+            String output,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions,
+            DifficultyQuota difficultyQuota
+    ) throws JsonProcessingException {
         validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
+        validateDifficultyQuota(difficultyQuota, minQuestions, maxQuestions);
         JsonNode questions = objectMapper.readTree(output).path("questions");
         if (!questions.isArray()
                 || questions.size() < minQuestions
@@ -466,7 +507,8 @@ public class GeminiQuestionGenerationClient {
         List<GeneratedQuestion> selected = selectHighQualityQuestions(
                 result,
                 maxQuestions,
-                allowedPhotoIds.size()
+                allowedPhotoIds.size(),
+                difficultyQuota
         );
         if (selected.size() < minQuestions) {
             throw invalidResponse();
@@ -475,7 +517,7 @@ public class GeminiQuestionGenerationClient {
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v8";
+        return model + ":album-recall-mcq-v9";
     }
 
     private static void validateQuestionRange(
@@ -492,10 +534,33 @@ public class GeminiQuestionGenerationClient {
         }
     }
 
+    private static void validateDifficultyQuota(
+            DifficultyQuota difficultyQuota,
+            int minQuestions,
+            int maxQuestions
+    ) {
+        if (difficultyQuota == null) return;
+        if (minQuestions != maxQuestions
+                || difficultyQuota.easy() < 0
+                || difficultyQuota.medium() < 0
+                || difficultyQuota.hard() < 0
+                || difficultyQuota.total() != maxQuestions) {
+            throw new IllegalArgumentException("Difficulty quota is invalid.");
+        }
+    }
+
+    private static String difficultyInstruction(DifficultyQuota quota) {
+        if (quota == null) return "";
+        return "\n최종 선택 질문의 난이도는 반드시 EASY " + quota.easy()
+                + "개, MEDIUM " + quota.medium() + "개, HARD " + quota.hard()
+                + "개가 되어야 합니다. 후보에도 이 수량 이상을 반드시 포함하고, 추가 후보는 EASY 또는 MEDIUM으로 만드세요.";
+    }
+
     private static List<GeneratedQuestion> selectHighQualityQuestions(
             List<GeneratedQuestion> candidates,
             int maxQuestions,
-            int availablePhotoCount
+            int availablePhotoCount,
+            DifficultyQuota difficultyQuota
     ) {
         List<GeneratedQuestion> ranked = new ArrayList<>(candidates);
         ranked.sort(Comparator.comparingInt(GeminiQuestionGenerationClient::qualityScore).reversed());
@@ -505,16 +570,23 @@ public class GeminiQuestionGenerationClient {
         boolean enforceEvidenceBalance = availablePhotoCount >= 6;
         Map<String, Integer> topicCounts = new HashMap<>();
         Map<Long, Integer> evidenceCounts = new HashMap<>();
+        Map<Question.Difficulty, Integer> difficultyCounts = new EnumMap<>(Question.Difficulty.class);
         List<GeneratedQuestion> selected = new ArrayList<>();
 
         addRankedQuestions(
-                ranked, selected, topicCounts, evidenceCounts,
-                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, true
+                ranked, selected, topicCounts, evidenceCounts, difficultyCounts,
+                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, true, difficultyQuota
         );
         addRankedQuestions(
-                ranked, selected, topicCounts, evidenceCounts,
-                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, false
+                ranked, selected, topicCounts, evidenceCounts, difficultyCounts,
+                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, false, difficultyQuota
         );
+        if (difficultyQuota != null) {
+            addRankedQuestions(
+                    ranked, selected, topicCounts, evidenceCounts, difficultyCounts,
+                    maxQuestions, topicCap, evidenceCap, false, false, difficultyQuota
+            );
+        }
         Set<GeneratedQuestion> chosen = new HashSet<>(selected);
         return candidates.stream()
                 .filter(chosen::contains)
@@ -527,15 +599,22 @@ public class GeminiQuestionGenerationClient {
             List<GeneratedQuestion> selected,
             Map<String, Integer> topicCounts,
             Map<Long, Integer> evidenceCounts,
+            Map<Question.Difficulty, Integer> difficultyCounts,
             int maxQuestions,
             int topicCap,
             int evidenceCap,
             boolean enforceEvidenceBalance,
-            boolean enforceTopicBalance
+            boolean enforceTopicBalance,
+            DifficultyQuota difficultyQuota
     ) {
         for (GeneratedQuestion question : ranked) {
             if (selected.size() >= maxQuestions) return;
             if (selected.contains(question)) continue;
+            if (difficultyQuota != null
+                    && difficultyCounts.getOrDefault(question.difficulty(), 0)
+                    >= difficultyQuota.count(question.difficulty())) {
+                continue;
+            }
 
             String topic = inferTopic(question);
             if (enforceTopicBalance && topicCounts.getOrDefault(topic, 0) >= topicCap) {
@@ -547,6 +626,7 @@ public class GeminiQuestionGenerationClient {
             }
 
             selected.add(question);
+            difficultyCounts.merge(question.difficulty(), 1, Integer::sum);
             topicCounts.merge(topic, 1, Integer::sum);
             question.evidencePhotoIds().forEach(id -> evidenceCounts.merge(id, 1, Integer::sum));
         }
@@ -730,4 +810,18 @@ public class GeminiQuestionGenerationClient {
             boolean verifiable,
             String referenceInformation
     ) {}
+
+    record DifficultyQuota(int easy, int medium, int hard) {
+        int total() {
+            return easy + medium + hard;
+        }
+
+        int count(Question.Difficulty difficulty) {
+            return switch (difficulty) {
+                case EASY -> easy;
+                case MEDIUM -> medium;
+                case HARD -> hard;
+            };
+        }
+    }
 }

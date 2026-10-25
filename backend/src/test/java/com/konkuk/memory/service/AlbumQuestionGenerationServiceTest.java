@@ -1,36 +1,44 @@
 package com.konkuk.memory.service;
 
+import com.konkuk.memory.entity.Question;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AlbumQuestionGenerationServiceTest {
 
     @Test
-    void plansEightToTenTotalQuestionsForSixOrSevenScenes() {
-        var withoutFixedQuestions = AlbumQuestionGenerationService.questionPlan(6, 0);
-        var withTwoFixedQuestions = AlbumQuestionGenerationService.questionPlan(7, 2);
+    void alwaysPlansTenQuestionsWithoutDeterministicQuestions() {
+        var plan = AlbumQuestionGenerationService.questionPlan(List.of());
 
-        assertThat(withoutFixedQuestions.minAiQuestions()).isEqualTo(8);
-        assertThat(withoutFixedQuestions.maxAiQuestions()).isEqualTo(10);
-        assertThat(withoutFixedQuestions.candidateAiQuestions()).isEqualTo(12);
-        assertThat(withoutFixedQuestions.maxTotalQuestions()).isEqualTo(10);
-        assertThat(withTwoFixedQuestions.minAiQuestions()).isEqualTo(6);
-        assertThat(withTwoFixedQuestions.maxAiQuestions()).isEqualTo(8);
-        assertThat(withTwoFixedQuestions.candidateAiQuestions()).isEqualTo(10);
+        assertThat(plan.aiQuestions()).isEqualTo(10);
+        assertThat(plan.candidateAiQuestions()).isEqualTo(13);
+        assertThat(plan.totalQuestions()).isEqualTo(10);
+        assertThat(plan.aiDifficultyQuota())
+                .isEqualTo(new GeminiQuestionGenerationClient.DifficultyQuota(5, 4, 1));
     }
 
     @Test
-    void plansTenToThirteenTotalQuestionsForEightOrMoreScenes() {
-        var withoutFixedQuestions = AlbumQuestionGenerationService.questionPlan(8, 0);
-        var withTwoFixedQuestions = AlbumQuestionGenerationService.questionPlan(10, 2);
+    void subtractsLocationAndTimelineFromFixedDifficultyMix() {
+        var plan = AlbumQuestionGenerationService.questionPlan(List.of(
+                question(Question.Difficulty.EASY),
+                question(Question.Difficulty.MEDIUM)
+        ));
 
-        assertThat(withoutFixedQuestions.minAiQuestions()).isEqualTo(10);
-        assertThat(withoutFixedQuestions.maxAiQuestions()).isEqualTo(11);
-        assertThat(withoutFixedQuestions.candidateAiQuestions()).isEqualTo(13);
-        assertThat(withoutFixedQuestions.maxTotalQuestions()).isEqualTo(13);
-        assertThat(withTwoFixedQuestions.minAiQuestions()).isEqualTo(8);
-        assertThat(withTwoFixedQuestions.maxAiQuestions()).isEqualTo(11);
-        assertThat(withTwoFixedQuestions.candidateAiQuestions()).isEqualTo(13);
+        assertThat(plan.aiQuestions()).isEqualTo(8);
+        assertThat(plan.candidateAiQuestions()).isEqualTo(11);
+        assertThat(plan.totalQuestions()).isEqualTo(10);
+        assertThat(plan.aiDifficultyQuota())
+                .isEqualTo(new GeminiQuestionGenerationClient.DifficultyQuota(4, 3, 1));
+    }
+
+    private static GeminiQuestionGenerationClient.GeneratedQuestion question(Question.Difficulty difficulty) {
+        return new GeminiQuestionGenerationClient.GeneratedQuestion(
+                "질문?", Question.Type.CONTEXT, difficulty,
+                List.of("1", "2", "3", "4"), 0,
+                List.of(1L), List.of(), true, "근거"
+        );
     }
 }

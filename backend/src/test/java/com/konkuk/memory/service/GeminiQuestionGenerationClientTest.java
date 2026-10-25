@@ -41,7 +41,32 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v8");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v9");
+    }
+
+    @Test
+    void selectsExactRequestedDifficultyMix() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(11));
+        for (int index = 0; index < 11; index++) {
+            ((ObjectNode) root.path("questions").path(index)).put(
+                    "difficulty",
+                    index < 4 ? "EASY" : index < 9 ? "MEDIUM" : "HARD"
+            );
+        }
+
+        var questions = client.normalize(
+                root.toString(),
+                Set.of(11L, 12L),
+                8,
+                8,
+                11,
+                new GeminiQuestionGenerationClient.DifficultyQuota(4, 3, 1)
+        );
+
+        assertThat(questions).hasSize(8);
+        assertThat(questions.stream().filter(q -> q.difficulty() == Question.Difficulty.EASY)).hasSize(4);
+        assertThat(questions.stream().filter(q -> q.difficulty() == Question.Difficulty.MEDIUM)).hasSize(3);
+        assertThat(questions.stream().filter(q -> q.difficulty() == Question.Difficulty.HARD)).hasSize(1);
     }
 
     @Test

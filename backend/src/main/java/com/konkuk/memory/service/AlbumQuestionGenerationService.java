@@ -1,9 +1,11 @@
 package com.konkuk.memory.service;
 
 import com.konkuk.memory.dto.TrainingSessionDetailResponse;
+import com.konkuk.memory.entity.Question;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AlbumQuestionGenerationService {
@@ -49,24 +51,24 @@ public class AlbumQuestionGenerationService {
             var generated = new ArrayList<GeminiQuestionGenerationClient.GeneratedQuestion>();
             locationQuestionFactory.create(context.evidenceJson()).ifPresent(generated::add);
             timelineQuestionFactory.create(context.evidenceJson()).ifPresent(generated::add);
-            QuestionPlan plan = questionPlan(
-                    readiness.eligibleSceneCount(),
-                    generated.size()
-            );
+            QuestionPlan plan = questionPlan(generated);
             generated.addAll(geminiClient.generate(
                     context.evidenceJson(),
                     context.photoIds(),
-                    plan.minAiQuestions(),
-                    plan.maxAiQuestions(),
-                    plan.candidateAiQuestions()
+                    plan.aiQuestions(),
+                    plan.aiQuestions(),
+                    plan.candidateAiQuestions(),
+                    plan.aiDifficultyQuota()
             ));
-            var limited = generated.stream().limit(plan.maxTotalQuestions()).toList();
+            if (generated.size() != plan.totalQuestions()) {
+                throw new IllegalStateException("Exactly 10 quiz questions must be generated.");
+            }
 
             persistenceService.complete(
                     userId,
                     sessionId,
                     context.evidenceJson(),
-                    limited,
+                    generated,
                     geminiClient.generationVersion()
             );
         } catch (RuntimeException ex) {
@@ -77,24 +79,45 @@ public class AlbumQuestionGenerationService {
         return myPageService.trainingSession(userId, sessionId);
     }
 
-    static QuestionPlan questionPlan(int eligibleSceneCount, int deterministicQuestionCount) {
-        int targetMin = eligibleSceneCount >= 8 ? 10 : 8;
-        int targetMax = eligibleSceneCount >= 8 ? 13 : 10;
-        int minAi = Math.max(6, targetMin - deterministicQuestionCount);
-        int maxAi = Math.min(11, targetMax - deterministicQuestionCount);
-        int candidateAi = Math.min(13, maxAi + 2);
+    static QuestionPlan questionPlan(List<GeminiQuestionGenerationClient.GeneratedQuestion> deterministicQuestions) {
+        int deterministicEasy = countDifficulty(deterministicQuestions, Question.Difficulty.EASY);
+        int deterministicMedium = countDifficulty(deterministicQuestions, Question.Difficulty.MEDIUM);
+        int deterministicHard = countDifficulty(deterministicQuestions, Question.Difficulty.HARD);
+        int deterministicCount = deterministicQuestions.size();
+        if (deterministicCount > 2
+                || deterministicEasy > 5
+                || deterministicMedium > 4
+                || deterministicHard > 1) {
+            throw new IllegalArgumentException("Deterministic question mix exceeds the fixed quiz plan.");
+        }
+
+        int aiQuestions = 10 - deterministicCount;
+        int candidateAi = Math.min(13, aiQuestions + 3);
         return new QuestionPlan(
-                Math.min(minAi, maxAi),
-                maxAi,
+                aiQuestions,
                 candidateAi,
-                targetMax
+                new GeminiQuestionGenerationClient.DifficultyQuota(
+                        5 - deterministicEasy,
+                        4 - deterministicMedium,
+                        1 - deterministicHard
+                ),
+                10
         );
     }
 
+    private static int countDifficulty(
+            List<GeminiQuestionGenerationClient.GeneratedQuestion> questions,
+            Question.Difficulty difficulty
+    ) {
+        return (int) questions.stream()
+                .filter(question -> question.difficulty() == difficulty)
+                .count();
+    }
+
     record QuestionPlan(
-            int minAiQuestions,
-            int maxAiQuestions,
+            int aiQuestions,
             int candidateAiQuestions,
-            int maxTotalQuestions
+            GeminiQuestionGenerationClient.DifficultyQuota aiDifficultyQuota,
+            int totalQuestions
     ) {}
 }
