@@ -23,23 +23,22 @@
 | 이메일 | `test@1234.com` |
 | 비밀번호 | `12345678` |
 
+> 첫 접속이나 로그인 시 서버 응답까지 시간이 걸릴 수 있습니다. ‘처리 중…’으로 표시되면 잠시 기다려 주세요.
+
 ## 화면 미리보기
 
-배포 사이트에서 직접 캡처한 화면입니다. (2026-10-25)
+배포 사이트에서 테스트 계정으로 로그인한 뒤 직접 캡처한 화면입니다. (2026-10-25)
 
 <table>
-<tr>
-<th width="50%">01 · 시작 화면</th>
-<th width="50%">02 · 로그인</th>
-</tr>
-<tr>
-<td><img src="assets/screenshots/home.png" alt="기억산책 홈 화면 — 사진에 담긴 순간, 나의 이야기로 이어가요" width="100%"></td>
-<td><img src="assets/screenshots/login.png" alt="기억산책 로그인 화면" width="100%"></td>
-</tr>
-<tr>
-<td align="center">서비스 소개와 시작 안내</td>
-<td align="center">테스트 계정으로 서비스 체험</td>
-</tr>
+<tr><th width="50%">01 · 시작 화면</th><th width="50%">02 · 로그인</th></tr>
+<tr><td><img src="assets/screenshots/home.png" alt="기억산책 01 · 시작 화면" width="100%"></td><td><img src="assets/screenshots/login.png" alt="기억산책 02 · 로그인" width="100%"></td></tr>
+<tr><td align="center">서비스 소개와 시작 안내</td><td align="center">테스트 계정으로 서비스 체험</td></tr>
+<tr><th width="50%">03 · 사진 보관함</th><th width="50%">04 · 마이페이지</th></tr>
+<tr><td><img src="assets/screenshots/albums.png" alt="기억산책 03 · 사진 보관함" width="100%"></td><td><img src="assets/screenshots/mypage.png" alt="기억산책 04 · 마이페이지" width="100%"></td></tr>
+<tr><td align="center">사진을 앨범별로 관리</td><td align="center">회원 정보와 나의 훈련 여정</td></tr>
+<tr><th width="50%">05 · 성장 기록</th><th width="50%">06 · 퀴즈 결과</th></tr>
+<tr><td><img src="assets/screenshots/growth.png" alt="기억산책 05 · 성장 기록" width="100%"></td><td><img src="assets/screenshots/quiz-result.png" alt="기억산책 06 · 퀴즈 결과" width="100%"></td></tr>
+<tr><td align="center">경험치·레벨·정답률 변화</td><td align="center">점수·경험치와 저장된 결과</td></tr>
 </table>
 
 ## 사용 흐름
