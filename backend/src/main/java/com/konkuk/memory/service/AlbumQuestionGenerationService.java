@@ -8,8 +8,6 @@ import java.util.ArrayList;
 @Service
 public class AlbumQuestionGenerationService {
 
-    private static final int MAX_QUESTIONS = 13;
-
     private final AlbumPhotoAnalysisService albumPhotoAnalysisService;
     private final AlbumQuestionReadinessService readinessService;
     private final AlbumQuestionContextService contextService;
@@ -51,8 +49,17 @@ public class AlbumQuestionGenerationService {
             var generated = new ArrayList<GeminiQuestionGenerationClient.GeneratedQuestion>();
             locationQuestionFactory.create(context.evidenceJson()).ifPresent(generated::add);
             timelineQuestionFactory.create(context.evidenceJson()).ifPresent(generated::add);
-            generated.addAll(geminiClient.generate(context.evidenceJson(), context.photoIds()));
-            var limited = generated.stream().limit(MAX_QUESTIONS).toList();
+            QuestionPlan plan = questionPlan(
+                    readiness.eligibleSceneCount(),
+                    generated.size()
+            );
+            generated.addAll(geminiClient.generate(
+                    context.evidenceJson(),
+                    context.photoIds(),
+                    plan.minAiQuestions(),
+                    plan.maxAiQuestions()
+            ));
+            var limited = generated.stream().limit(plan.maxTotalQuestions()).toList();
 
             persistenceService.complete(
                     userId,
@@ -68,4 +75,18 @@ public class AlbumQuestionGenerationService {
 
         return myPageService.trainingSession(userId, sessionId);
     }
+
+    static QuestionPlan questionPlan(int eligibleSceneCount, int deterministicQuestionCount) {
+        int targetMin = eligibleSceneCount >= 8 ? 10 : 8;
+        int targetMax = eligibleSceneCount >= 8 ? 13 : 10;
+        int minAi = Math.max(6, targetMin - deterministicQuestionCount);
+        int maxAi = Math.min(11, targetMax - deterministicQuestionCount);
+        return new QuestionPlan(Math.min(minAi, maxAi), maxAi, targetMax);
+    }
+
+    record QuestionPlan(
+            int minAiQuestions,
+            int maxAiQuestions,
+            int maxTotalQuestions
+    ) {}
 }

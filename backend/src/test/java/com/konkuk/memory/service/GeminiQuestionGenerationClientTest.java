@@ -41,7 +41,13 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v6");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v7");
+    }
+
+    @Test
+    void supportsSixQuestionPlanForAlbumsWithFewerRepresentativeScenes() throws Exception {
+        assertThat(client.normalize(validOutput(6), Set.of(11L, 12L), 6, 8))
+                .hasSize(6);
     }
 
     @Test

@@ -23,7 +23,7 @@ import java.util.Set;
 public class AlbumQuestionReadinessService {
 
     static final int MIN_SUITABILITY_SCORE = 60;
-    static final int MIN_DISTINCT_SCENES = 4;
+    static final int MIN_DISTINCT_SCENES = 6;
     private static final String TOPIC_ACTIVITY = "ACTIVITY";
     private static final String TOPIC_FOOD_DRINK = "FOOD_DRINK";
     private static final String TOPIC_PLACE = "PLACE";

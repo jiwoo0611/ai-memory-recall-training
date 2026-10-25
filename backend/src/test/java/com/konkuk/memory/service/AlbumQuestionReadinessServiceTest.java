@@ -16,14 +16,16 @@ import static org.mockito.Mockito.when;
 class AlbumQuestionReadinessServiceTest {
 
     @Test
-    void acceptsFourDistinctHighQualityScenesAndKeepsOnePhotoPerScene() {
+    void acceptsSixDistinctHighQualityScenesAndKeepsOnePhotoPerScene() {
         PhotoRepository photos = mock(PhotoRepository.class);
         List<Photo> albumPhotos = List.of(
                 photo(1L, 85, "모닥불 감상", "activity"),
                 photo(2L, 70, "모닥불 감상", "activity"),
                 photo(3L, 80, "저녁 식사", "food"),
                 photo(4L, 75, "산책", "timeline"),
-                photo(5L, 90, "랜드마크 관람", "landmark")
+                photo(5L, 90, "랜드마크 관람", "landmark"),
+                photo(6L, 82, "캠핑 준비", "activity", "timeline"),
+                photo(7L, 78, "음료 마시기", "drink")
         );
         when(photos.findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(7L, 3L))
                 .thenReturn(albumPhotos);
@@ -31,9 +33,11 @@ class AlbumQuestionReadinessServiceTest {
         var service = new AlbumQuestionReadinessService(photos, new ObjectMapper());
         var readiness = service.requireReady(3L, 7L);
 
-        assertThat(readiness.totalPhotoCount()).isEqualTo(5);
-        assertThat(readiness.eligibleSceneCount()).isEqualTo(4);
-        assertThat(readiness.eligiblePhotoIds()).containsExactlyInAnyOrder(1L, 3L, 4L, 5L);
+        assertThat(readiness.totalPhotoCount()).isEqualTo(7);
+        assertThat(readiness.eligibleSceneCount()).isEqualTo(6);
+        assertThat(readiness.eligiblePhotoIds()).containsExactlyInAnyOrder(
+                1L, 3L, 4L, 5L, 6L, 7L
+        );
     }
 
     @Test
@@ -54,7 +58,7 @@ class AlbumQuestionReadinessServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("전체 4장")
                 .hasMessageContaining("대표 장면이 2개")
-                .hasMessageContaining("2개 이상 더 추가")
+                .hasMessageContaining("4개 이상 더 추가")
                 .hasMessageContaining("음식·음료 사진")
                 .hasMessageContaining("장소나 랜드마크");
     }

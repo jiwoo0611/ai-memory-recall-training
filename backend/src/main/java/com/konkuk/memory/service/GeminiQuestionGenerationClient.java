@@ -31,12 +31,13 @@ public class GeminiQuestionGenerationClient {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiQuestionGenerationClient.class);
 
-    private static final int MIN_AI_QUESTIONS = 8;
-    private static final int MAX_AI_QUESTIONS = 11;
+    private static final int MIN_SUPPORTED_AI_QUESTIONS = 6;
+    private static final int MAX_SUPPORTED_AI_QUESTIONS = 11;
     private static final String PROMPT = """
             당신은 사진을 계기로 실제 경험을 편안하게 떠올리게 하는 인지 훈련용 회상 퀴즈 전문가입니다.
             아래 JSON은 한 앨범의 사진에서 얻은 통합 근거입니다.
-            앨범 속 하루나 사건의 큰 흐름을 떠올리게 하는 쉬운 한국어 객관식 질문을 8~11개 만드세요.
+            앨범 속 하루나 사건의 큰 흐름을 떠올리게 하는 쉬운 한국어 객관식 질문을 요청된 개수 범위에 맞춰 만드세요.
+            개수를 채우려고 근거가 약하거나 사소한 질문을 만들지 말고, 서로 다른 대표 기억을 우선하세요.
 
             좋은 질문의 기준:
             - 정답은 AI 단서, EXIF 촬영 순서 또는 위치 정보에서 직접 검증되어야 합니다.
@@ -51,9 +52,9 @@ public class GeminiQuestionGenerationClient {
             - 다시 검사하여 '이 문항이 사소한 관찰력이 아니라 실제 경험 회상을 돕는가'를 만족하지 않으면 다른 핵심 기억으로 교체하세요.
 
             난이도 기준:
-            - EASY 4~6개: 그날의 대표 활동, 먹은 음식, 마신 음료 종류처럼 바로 떠올릴 수 있는 핵심 기억을 묻습니다.
+            - EASY는 전체의 절반 정도로 구성하고, 그날의 대표 활동, 먹은 음식, 마신 음료 종류처럼 바로 떠올릴 수 있는 핵심 기억을 묻습니다.
             - 장면 중심 대상의 두드러진 색상은 EASY에 사용할 수 있습니다. 예: '불멍 사진에서 불꽃은 어떤 색이었나요?'
-            - MEDIUM 3~5개: 같은 날의 장면 2개를 연결하거나 활동과 음식, 준비와 마무리 같은 사건 흐름을 묻습니다.
+            - MEDIUM은 나머지 대부분으로 구성하고, 같은 날의 장면 2개를 연결하거나 활동과 음식, 준비와 마무리 같은 사건 흐름을 묻습니다.
             - HARD는 0~1개만 허용하며, 서로 다른 사진 2~3장의 전후 활동이나 사건 순서를 종합합니다.
             - HARD는 evidencePhotoIds에 반드시 서로 다른 사진 ID를 2개 이상 넣으세요.
 
@@ -101,15 +102,14 @@ public class GeminiQuestionGenerationClient {
             - evidencePhotoIds에는 실제로 사용한 photoId만 최대 4개 넣으세요.
             - referenceInformation에는 정답을 뒷받침하는 사진별 근거를 짧고 구체적으로 적으세요.
 
-            앨범 사진 통합 근거 JSON:
             """;
     private static final Map<String, Object> RESPONSE_SCHEMA = Map.of(
             "type", "object",
             "properties", Map.of(
                     "questions", Map.of(
                             "type", "array",
-                            "minItems", MIN_AI_QUESTIONS,
-                            "maxItems", MAX_AI_QUESTIONS,
+                            "minItems", MIN_SUPPORTED_AI_QUESTIONS,
+                            "maxItems", MAX_SUPPORTED_AI_QUESTIONS,
                             "items", Map.of(
                                     "type", "object",
                                     "properties", Map.of(
@@ -187,6 +187,15 @@ public class GeminiQuestionGenerationClient {
     }
 
     public List<GeneratedQuestion> generate(String evidenceJson, Set<Long> allowedPhotoIds) {
+        return generate(evidenceJson, allowedPhotoIds, 8, 11);
+    }
+
+    public List<GeneratedQuestion> generate(
+            String evidenceJson,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions
+    ) {
         if (apiKey.isBlank()) {
             throw new ApiException(
                     HttpStatus.SERVICE_UNAVAILABLE,
@@ -194,10 +203,16 @@ public class GeminiQuestionGenerationClient {
                     "Gemini API 키가 설정되지 않았습니다."
             );
         }
+        validateQuestionRange(minQuestions, maxQuestions);
+
+        String requestPrompt = PROMPT
+                + "\n이번 응답에는 질문을 " + minQuestions + "~" + maxQuestions + "개 생성하세요."
+                + "\n\n앨범 사진 통합 근거 JSON:\n"
+                + evidenceJson;
 
         Map<String, Object> request = Map.of(
                 "contents", List.of(Map.of(
-                        "parts", List.of(Map.of("text", PROMPT + evidenceJson))
+                        "parts", List.of(Map.of("text", requestPrompt))
                 )),
                 "generationConfig", Map.of(
                         "responseMimeType", "application/json",
@@ -214,7 +229,7 @@ public class GeminiQuestionGenerationClient {
                 if (output == null || output.isBlank()) {
                     throw invalidResponse();
                 }
-                return normalize(output, allowedPhotoIds);
+                return normalize(output, allowedPhotoIds, minQuestions, maxQuestions);
             } catch (JsonProcessingException ex) {
                 lastInvalidResponse = invalidResponse();
             } catch (ApiException ex) {
@@ -272,8 +287,18 @@ public class GeminiQuestionGenerationClient {
     }
 
     List<GeneratedQuestion> normalize(String output, Set<Long> allowedPhotoIds) throws JsonProcessingException {
+        return normalize(output, allowedPhotoIds, 8, 11);
+    }
+
+    List<GeneratedQuestion> normalize(
+            String output,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions
+    ) throws JsonProcessingException {
+        validateQuestionRange(minQuestions, maxQuestions);
         JsonNode questions = objectMapper.readTree(output).path("questions");
-        if (!questions.isArray() || questions.size() < MIN_AI_QUESTIONS || questions.size() > MAX_AI_QUESTIONS) {
+        if (!questions.isArray() || questions.size() < minQuestions || questions.size() > maxQuestions) {
             throw invalidResponse();
         }
 
@@ -391,14 +416,22 @@ public class GeminiQuestionGenerationClient {
             ));
         }
 
-        if (result.size() < MIN_AI_QUESTIONS || result.size() > MAX_AI_QUESTIONS) {
+        if (result.size() < minQuestions || result.size() > maxQuestions) {
             throw invalidResponse();
         }
         return List.copyOf(result);
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v6";
+        return model + ":album-recall-mcq-v7";
+    }
+
+    private static void validateQuestionRange(int minQuestions, int maxQuestions) {
+        if (minQuestions < MIN_SUPPORTED_AI_QUESTIONS
+                || maxQuestions > MAX_SUPPORTED_AI_QUESTIONS
+                || minQuestions > maxQuestions) {
+            throw new IllegalArgumentException("Question count range is invalid.");
+        }
     }
 
     private static boolean containsOptionInQuestion(String content, List<String> options) {
