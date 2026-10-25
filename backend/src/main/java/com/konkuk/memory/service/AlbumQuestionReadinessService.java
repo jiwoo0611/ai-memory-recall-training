@@ -24,6 +24,10 @@ public class AlbumQuestionReadinessService {
 
     static final int MIN_SUITABILITY_SCORE = 60;
     static final int MIN_DISTINCT_SCENES = 4;
+    private static final String TOPIC_ACTIVITY = "ACTIVITY";
+    private static final String TOPIC_FOOD_DRINK = "FOOD_DRINK";
+    private static final String TOPIC_PLACE = "PLACE";
+    private static final String TOPIC_TIMELINE = "TIMELINE";
 
     private final PhotoRepository photoRepository;
     private final ObjectMapper objectMapper;
@@ -41,11 +45,13 @@ public class AlbumQuestionReadinessService {
                 .findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(albumId, userId);
 
         Map<String, Candidate> bestByScene = new LinkedHashMap<>();
+        Set<String> availableTopics = new LinkedHashSet<>();
         for (Photo photo : photos) {
             Candidate candidate = assess(photo);
             if (candidate == null || candidate.score() < MIN_SUITABILITY_SCORE) {
                 continue;
             }
+            availableTopics.addAll(candidate.topics());
             bestByScene.merge(
                     candidate.sceneKey(),
                     candidate,
@@ -62,13 +68,15 @@ public class AlbumQuestionReadinessService {
         int additionalRequired = Math.max(0, MIN_DISTINCT_SCENES - sceneCount);
 
         if (additionalRequired > 0) {
+            String recommendation = buildRecommendation(availableTopics, additionalRequired);
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "QUESTION_PHOTO_QUALITY_INSUFFICIENT",
                     "전체 " + photos.size() + "장 중 질문에 사용할 만한 서로 다른 대표 장면이 "
                             + sceneCount + "개입니다. "
                             + "회상 퀴즈를 만들려면 활동·음식·장소처럼 서로 다른 장면의 사진을 "
-                            + additionalRequired + "개 이상 더 추가해주세요."
+                            + additionalRequired + "개 이상 더 추가해주세요. "
+                            + recommendation
             );
         }
 
@@ -113,7 +121,12 @@ public class AlbumQuestionReadinessService {
             if (normalizedKey.isBlank()) {
                 normalizedKey = "photo-" + photo.getId();
             }
-            return new Candidate(photo.getId(), score, normalizedKey);
+            return new Candidate(
+                    photo.getId(),
+                    score,
+                    normalizedKey,
+                    extractTopics(clues, suitability)
+            );
         } catch (JsonProcessingException ex) {
             return null;
         }
@@ -128,6 +141,54 @@ public class AlbumQuestionReadinessService {
         if (hasHighConfidenceItem(clues.path("landmarks"))) score += 25;
         if (clues.path("uncertainties").size() >= 3) score -= 10;
         return Math.max(0, Math.min(100, score));
+    }
+
+    private static Set<String> extractTopics(JsonNode clues, JsonNode suitability) {
+        Set<String> topics = new LinkedHashSet<>();
+        JsonNode usableTopics = suitability.path("usableTopics");
+        if (usableTopics.isArray()) {
+            usableTopics.forEach(value -> {
+                String topic = clean(value.asText("")).toLowerCase(Locale.ROOT);
+                if (topic.contains("activity") || topic.contains("활동")) {
+                    topics.add(TOPIC_ACTIVITY);
+                }
+                if (topic.contains("food") || topic.contains("drink")
+                        || topic.contains("음식") || topic.contains("음료")) {
+                    topics.add(TOPIC_FOOD_DRINK);
+                }
+                if (topic.contains("landmark") || topic.contains("place")
+                        || topic.contains("location") || topic.contains("장소")) {
+                    topics.add(TOPIC_PLACE);
+                }
+                if (topic.contains("timeline") || topic.contains("시간")) {
+                    topics.add(TOPIC_TIMELINE);
+                }
+            });
+        }
+
+        if (hasValues(clues.path("activities"))) topics.add(TOPIC_ACTIVITY);
+        if (hasConfidentItem(clues.path("foods"))) topics.add(TOPIC_FOOD_DRINK);
+        if (hasHighConfidenceItem(clues.path("landmarks"))) topics.add(TOPIC_PLACE);
+        return Set.copyOf(topics);
+    }
+
+    private static String buildRecommendation(Set<String> availableTopics, int additionalRequired) {
+        Map<String, String> recommendations = new LinkedHashMap<>();
+        recommendations.put(TOPIC_ACTIVITY, "무엇을 했는지 보이는 활동 사진");
+        recommendations.put(TOPIC_FOOD_DRINK, "먹거나 마신 것이 보이는 음식·음료 사진");
+        recommendations.put(TOPIC_PLACE, "방문한 장소나 랜드마크가 보이는 사진");
+        recommendations.put(TOPIC_TIMELINE, "준비·이동·마무리처럼 다른 시간대의 사진");
+
+        List<String> missing = recommendations.entrySet().stream()
+                .filter(entry -> !availableTopics.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .limit(Math.min(3, Math.max(1, additionalRequired)))
+                .toList();
+
+        if (missing.isEmpty()) {
+            return "현재 사진과 다른 장면의 사진을 추가해주세요.";
+        }
+        return "추천: " + String.join(", ", missing) + "을 추가해주세요.";
     }
 
     private static String fallbackSceneKey(JsonNode clues) {
@@ -203,7 +264,12 @@ public class AlbumQuestionReadinessService {
         return value == null ? "" : value.trim();
     }
 
-    private record Candidate(Long photoId, int score, String sceneKey) {}
+    private record Candidate(
+            Long photoId,
+            int score,
+            String sceneKey,
+            Set<String> topics
+    ) {}
 
     public record Readiness(
             int totalPhotoCount,

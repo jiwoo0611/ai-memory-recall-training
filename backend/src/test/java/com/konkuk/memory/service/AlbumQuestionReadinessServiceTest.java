@@ -19,11 +19,11 @@ class AlbumQuestionReadinessServiceTest {
     void acceptsFourDistinctHighQualityScenesAndKeepsOnePhotoPerScene() {
         PhotoRepository photos = mock(PhotoRepository.class);
         List<Photo> albumPhotos = List.of(
-                photo(1L, 85, "모닥불 감상"),
-                photo(2L, 70, "모닥불 감상"),
-                photo(3L, 80, "저녁 식사"),
-                photo(4L, 75, "산책"),
-                photo(5L, 90, "랜드마크 관람")
+                photo(1L, 85, "모닥불 감상", "activity"),
+                photo(2L, 70, "모닥불 감상", "activity"),
+                photo(3L, 80, "저녁 식사", "food"),
+                photo(4L, 75, "산책", "timeline"),
+                photo(5L, 90, "랜드마크 관람", "landmark")
         );
         when(photos.findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(7L, 3L))
                 .thenReturn(albumPhotos);
@@ -40,10 +40,10 @@ class AlbumQuestionReadinessServiceTest {
     void asksForMorePhotosBeforeQuestionGenerationWhenScenesAreInsufficient() {
         PhotoRepository photos = mock(PhotoRepository.class);
         List<Photo> albumPhotos = List.of(
-                photo(1L, 85, "모닥불 감상"),
-                photo(2L, 80, "모닥불 감상"),
-                photo(3L, 75, "저녁 식사"),
-                photo(4L, 40, "흐린 사진")
+                photo(1L, 85, "모닥불 감상", "activity"),
+                photo(2L, 80, "모닥불 감상", "activity"),
+                photo(3L, 75, "저녁 식사", "activity"),
+                photo(4L, 40, "흐린 사진", "activity")
         );
         when(photos.findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(7L, 3L))
                 .thenReturn(albumPhotos);
@@ -54,12 +54,15 @@ class AlbumQuestionReadinessServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("전체 4장")
                 .hasMessageContaining("대표 장면이 2개")
-                .hasMessageContaining("2개 이상 더 추가");
+                .hasMessageContaining("2개 이상 더 추가")
+                .hasMessageContaining("음식·음료 사진")
+                .hasMessageContaining("장소나 랜드마크");
     }
 
-    private static Photo photo(Long id, int score, String sceneKey) {
+    private static Photo photo(Long id, int score, String sceneKey, String... topics) {
         Photo photo = mock(Photo.class);
         when(photo.getId()).thenReturn(id);
+        String topicValues = String.join("\", \"", topics);
         when(photo.getAiClues()).thenReturn("""
                 {
                   "summary": "회상할 수 있는 장면",
@@ -67,11 +70,16 @@ class AlbumQuestionReadinessServiceTest {
                     "score": %d,
                     "quality": "%s",
                     "sceneKey": "%s",
-                    "usableTopics": ["activity"],
+                    "usableTopics": ["%s"],
                     "exclusionReasons": []
                   }
                 }
-                """.formatted(score, score >= 60 ? "GOOD" : "POOR", sceneKey));
+                """.formatted(
+                score,
+                score >= 60 ? "GOOD" : "POOR",
+                sceneKey,
+                topicValues
+        ));
         return photo;
     }
 }
