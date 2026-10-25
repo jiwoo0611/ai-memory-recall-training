@@ -8,7 +8,6 @@ import {
   Pager,
   labels,
 } from "../components/UI";
-import AlbumSection from "../components/AlbumSection";
 
 function useLoad(loader, dependency) {
   const [state, setState] = useState({ loading: true });
@@ -248,7 +247,7 @@ function SessionDetail({ id, onClose }) {
   );
 }
 
-export default function MyPage({ albumId }) {
+export default function MyPage() {
   const [trainingPage, setTrainingPage] =
     useState(0);
 
@@ -381,9 +380,6 @@ export default function MyPage({ albumId }) {
 
       <div className="dashboard">
         <div className="main-column">
-
-          {/* 앨범 + 사진 관리 */}
-          <AlbumSection key={albumId ?? "albums"} albumId={albumId} />
 
           {/* 회상 훈련 기록 */}
           <section className="card">

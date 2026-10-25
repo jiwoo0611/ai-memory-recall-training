@@ -851,8 +851,11 @@ dd {
 }
 @media (max-width: 580px) {
   header {
-    height: 80px;
-    padding: 0 20px;
+    min-height: 80px;
+    height: auto;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   .brand {
     font-size: 19px;
@@ -862,6 +865,7 @@ dd {
     height: 29px;
   }
   nav {
+    flex-wrap: wrap;
     gap: 13px;
     font-size: 12px;
   }
@@ -1411,3 +1415,10 @@ dd {
 .growth-bar small { color: #6f8175; white-space: nowrap; font-size: 11px; }
 @media (max-width: 580px) { .growth-stat-grid { grid-template-columns: repeat(2, 1fr); } .growth-chart { gap: 8px; } .growth-level { min-height: 46px; padding: 7px 12px; font-size: 1.3rem; } }
 @media (max-width: 850px) { .recall-layout { grid-template-columns: 1fr; } .recall-question { padding: 14px; } }
+.photo-library form {
+  flex-wrap: wrap;
+}
+.photo-library form input {
+  flex: 1 1 180px;
+  min-width: 0;
+}

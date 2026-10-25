@@ -512,7 +512,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
       <section className="card">
         <a
           className="back-link"
-          href="#/mypage"
+          href="#/albums"
         >
           ← 앨범 목록
         </a>
@@ -548,7 +548,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
           <div>
             <a
               className="back-link"
-              href="#/mypage"
+              href="#/albums"
             >
               ← 앨범 목록
             </a>

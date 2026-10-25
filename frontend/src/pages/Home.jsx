@@ -15,8 +15,8 @@ export default function Home({ signedIn }) {
             <br />
             기억산책이 당신의 이야기를 함께 간직합니다.
           </p>
-          <a className="button" href={signedIn ? "#/mypage" : "#/login"}>
-            {signedIn ? "내 기록 살펴보기" : "로그인하고 시작하기"}{" "}
+          <a className="button" href={signedIn ? "#/albums" : "#/login"}>
+            {signedIn ? "사진 보관함으로 이동" : "로그인하고 시작하기"}{" "}
             <span aria-hidden="true">↗</span>
           </a>
           <a

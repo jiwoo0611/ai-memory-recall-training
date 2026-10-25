@@ -3,6 +3,7 @@ import { api, session, clearSession, expireSession } from "./api/client";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MyPage from "./pages/MyPage";
+import AlbumsPage from "./pages/AlbumsPage";
 import PhotoDetailPage from "./pages/PhotoDetailPage";
 import RecallPage from "./pages/RecallPage";
 import { ErrorBox } from "./components/UI";
@@ -58,7 +59,7 @@ export default function App() {
     };
   }, [auth]);
   useEffect(() => {
-    if ((page === "/mypage" || albumRoute || quizRoute || photoRoute || trainingRoute) && !auth) {
+    if ((page === "/mypage" || page === "/albums" || albumRoute || quizRoute || photoRoute || trainingRoute) && !auth) {
       setNotice("내 기록을 확인하려면 로그인해주세요.");
       redirect("/login");
     }
@@ -106,9 +107,11 @@ export default function App() {
         }}
       />
     );
-  else if (page === "/mypage" || albumRoute)
+  else if (page === "/mypage")
+    content = auth ? <MyPage key={auth.accessToken} /> : <p role="status">로그인 화면으로 이동합니다…</p>;
+  else if (page === "/albums" || albumRoute)
     content = auth ? (
-      <MyPage
+      <AlbumsPage
         key={auth.accessToken}
         albumId={albumRoute ? decodeURIComponent(albumRoute[1]) : undefined}
       />
@@ -169,8 +172,14 @@ export default function App() {
           {auth ? (
             <>
               <a
+                href="#/albums"
+                aria-current={page === "/albums" || albumRoute || quizRoute || photoRoute ? "page" : undefined}
+              >
+                사진 보관함
+              </a>
+              <a
                 href="#/mypage"
-                aria-current={page === "/mypage" || albumRoute || quizRoute || photoRoute ? "page" : undefined}
+                aria-current={page === "/mypage" || trainingRoute ? "page" : undefined}
               >
                 마이페이지
               </a>
