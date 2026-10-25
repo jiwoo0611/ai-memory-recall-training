@@ -19,6 +19,8 @@ import org.springframework.web.client.RestClientResponseException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,7 +34,8 @@ public class GeminiQuestionGenerationClient {
     private static final Logger log = LoggerFactory.getLogger(GeminiQuestionGenerationClient.class);
 
     private static final int MIN_SUPPORTED_AI_QUESTIONS = 6;
-    private static final int MAX_SUPPORTED_AI_QUESTIONS = 11;
+    private static final int MAX_SELECTED_AI_QUESTIONS = 11;
+    private static final int MAX_CANDIDATE_AI_QUESTIONS = 13;
     private static final String PROMPT = """
             당신은 사진을 계기로 실제 경험을 편안하게 떠올리게 하는 인지 훈련용 회상 퀴즈 전문가입니다.
             아래 JSON은 한 앨범의 사진에서 얻은 통합 근거입니다.
@@ -109,7 +112,7 @@ public class GeminiQuestionGenerationClient {
                     "questions", Map.of(
                             "type", "array",
                             "minItems", MIN_SUPPORTED_AI_QUESTIONS,
-                            "maxItems", MAX_SUPPORTED_AI_QUESTIONS,
+                            "maxItems", MAX_CANDIDATE_AI_QUESTIONS,
                             "items", Map.of(
                                     "type", "object",
                                     "properties", Map.of(
@@ -187,7 +190,7 @@ public class GeminiQuestionGenerationClient {
     }
 
     public List<GeneratedQuestion> generate(String evidenceJson, Set<Long> allowedPhotoIds) {
-        return generate(evidenceJson, allowedPhotoIds, 8, 11);
+        return generate(evidenceJson, allowedPhotoIds, 8, 11, 13);
     }
 
     public List<GeneratedQuestion> generate(
@@ -196,6 +199,22 @@ public class GeminiQuestionGenerationClient {
             int minQuestions,
             int maxQuestions
     ) {
+        return generate(
+                evidenceJson,
+                allowedPhotoIds,
+                minQuestions,
+                maxQuestions,
+                Math.min(MAX_CANDIDATE_AI_QUESTIONS, maxQuestions + 2)
+        );
+    }
+
+    public List<GeneratedQuestion> generate(
+            String evidenceJson,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions
+    ) {
         if (apiKey.isBlank()) {
             throw new ApiException(
                     HttpStatus.SERVICE_UNAVAILABLE,
@@ -203,10 +222,12 @@ public class GeminiQuestionGenerationClient {
                     "Gemini API 키가 설정되지 않았습니다."
             );
         }
-        validateQuestionRange(minQuestions, maxQuestions);
+        validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
 
         String requestPrompt = PROMPT
-                + "\n이번 응답에는 질문을 " + minQuestions + "~" + maxQuestions + "개 생성하세요."
+                + "\n이번 응답에는 서로 다른 후보 질문을 " + candidateQuestions + "개 생성하세요."
+                + " 서버가 그중 품질이 높은 " + minQuestions + "~" + maxQuestions
+                + "개를 선택하므로 같은 정답이나 장면을 반복하지 마세요."
                 + "\n\n앨범 사진 통합 근거 JSON:\n"
                 + evidenceJson;
 
@@ -229,7 +250,13 @@ public class GeminiQuestionGenerationClient {
                 if (output == null || output.isBlank()) {
                     throw invalidResponse();
                 }
-                return normalize(output, allowedPhotoIds, minQuestions, maxQuestions);
+                return normalize(
+                        output,
+                        allowedPhotoIds,
+                        minQuestions,
+                        maxQuestions,
+                        candidateQuestions
+                );
             } catch (JsonProcessingException ex) {
                 lastInvalidResponse = invalidResponse();
             } catch (ApiException ex) {
@@ -287,7 +314,7 @@ public class GeminiQuestionGenerationClient {
     }
 
     List<GeneratedQuestion> normalize(String output, Set<Long> allowedPhotoIds) throws JsonProcessingException {
-        return normalize(output, allowedPhotoIds, 8, 11);
+        return normalize(output, allowedPhotoIds, 8, 11, 13);
     }
 
     List<GeneratedQuestion> normalize(
@@ -296,14 +323,27 @@ public class GeminiQuestionGenerationClient {
             int minQuestions,
             int maxQuestions
     ) throws JsonProcessingException {
-        validateQuestionRange(minQuestions, maxQuestions);
+        return normalize(output, allowedPhotoIds, minQuestions, maxQuestions, maxQuestions);
+    }
+
+    List<GeneratedQuestion> normalize(
+            String output,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions
+    ) throws JsonProcessingException {
+        validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
         JsonNode questions = objectMapper.readTree(output).path("questions");
-        if (!questions.isArray() || questions.size() < minQuestions || questions.size() > maxQuestions) {
+        if (!questions.isArray()
+                || questions.size() < minQuestions
+                || questions.size() > candidateQuestions) {
             throw invalidResponse();
         }
 
         List<GeneratedQuestion> result = new ArrayList<>();
         Set<String> uniqueQuestions = new HashSet<>();
+        Set<String> uniqueAnswers = new HashSet<>();
         int hardQuestionCount = 0;
 
         for (JsonNode item : questions) {
@@ -374,6 +414,9 @@ public class GeminiQuestionGenerationClient {
             }
 
             String reference = cleanText(item.path("referenceInformation").asText(""), 1_000);
+            String normalizedAnswer = correctOptionIndex >= 0 && correctOptionIndex < options.size()
+                    ? normalizeForComparison(options.get(correctOptionIndex))
+                    : "";
             if (content.isBlank()
                     || content.length() > 80
                     || containsPeopleTopic(content)
@@ -384,9 +427,13 @@ public class GeminiQuestionGenerationClient {
                     || options.stream().anyMatch(GeminiQuestionGenerationClient::containsPeopleTopic)
                     || correctOptionIndex < 0
                     || correctOptionIndex >= options.size()
+                    || normalizedAnswer.isBlank()
                     || containsOptionInQuestion(content, options)
                     || evidencePhotoIds.isEmpty()
                     || reference.isBlank()) {
+                continue;
+            }
+            if (!uniqueAnswers.add(normalizedAnswer)) {
                 continue;
             }
 
@@ -416,22 +463,137 @@ public class GeminiQuestionGenerationClient {
             ));
         }
 
-        if (result.size() < minQuestions || result.size() > maxQuestions) {
+        List<GeneratedQuestion> selected = selectHighQualityQuestions(
+                result,
+                maxQuestions,
+                allowedPhotoIds.size()
+        );
+        if (selected.size() < minQuestions) {
             throw invalidResponse();
         }
-        return List.copyOf(result);
+        return List.copyOf(selected);
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v7";
+        return model + ":album-recall-mcq-v8";
     }
 
-    private static void validateQuestionRange(int minQuestions, int maxQuestions) {
+    private static void validateQuestionRange(
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions
+    ) {
         if (minQuestions < MIN_SUPPORTED_AI_QUESTIONS
-                || maxQuestions > MAX_SUPPORTED_AI_QUESTIONS
-                || minQuestions > maxQuestions) {
+                || maxQuestions > MAX_SELECTED_AI_QUESTIONS
+                || minQuestions > maxQuestions
+                || candidateQuestions < maxQuestions
+                || candidateQuestions > MAX_CANDIDATE_AI_QUESTIONS) {
             throw new IllegalArgumentException("Question count range is invalid.");
         }
+    }
+
+    private static List<GeneratedQuestion> selectHighQualityQuestions(
+            List<GeneratedQuestion> candidates,
+            int maxQuestions,
+            int availablePhotoCount
+    ) {
+        List<GeneratedQuestion> ranked = new ArrayList<>(candidates);
+        ranked.sort(Comparator.comparingInt(GeminiQuestionGenerationClient::qualityScore).reversed());
+
+        int topicCap = Math.max(2, (int) Math.ceil(maxQuestions * 0.4));
+        int evidenceCap = Math.max(2, (int) Math.ceil(maxQuestions * 0.25));
+        boolean enforceEvidenceBalance = availablePhotoCount >= 6;
+        Map<String, Integer> topicCounts = new HashMap<>();
+        Map<Long, Integer> evidenceCounts = new HashMap<>();
+        List<GeneratedQuestion> selected = new ArrayList<>();
+
+        addRankedQuestions(
+                ranked, selected, topicCounts, evidenceCounts,
+                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, true
+        );
+        addRankedQuestions(
+                ranked, selected, topicCounts, evidenceCounts,
+                maxQuestions, topicCap, evidenceCap, enforceEvidenceBalance, false
+        );
+        Set<GeneratedQuestion> chosen = new HashSet<>(selected);
+        return candidates.stream()
+                .filter(chosen::contains)
+                .limit(maxQuestions)
+                .toList();
+    }
+
+    private static void addRankedQuestions(
+            List<GeneratedQuestion> ranked,
+            List<GeneratedQuestion> selected,
+            Map<String, Integer> topicCounts,
+            Map<Long, Integer> evidenceCounts,
+            int maxQuestions,
+            int topicCap,
+            int evidenceCap,
+            boolean enforceEvidenceBalance,
+            boolean enforceTopicBalance
+    ) {
+        for (GeneratedQuestion question : ranked) {
+            if (selected.size() >= maxQuestions) return;
+            if (selected.contains(question)) continue;
+
+            String topic = inferTopic(question);
+            if (enforceTopicBalance && topicCounts.getOrDefault(topic, 0) >= topicCap) {
+                continue;
+            }
+            if (enforceEvidenceBalance && question.evidencePhotoIds().stream()
+                    .anyMatch(id -> evidenceCounts.getOrDefault(id, 0) >= evidenceCap)) {
+                continue;
+            }
+
+            selected.add(question);
+            topicCounts.merge(topic, 1, Integer::sum);
+            question.evidencePhotoIds().forEach(id -> evidenceCounts.merge(id, 1, Integer::sum));
+        }
+    }
+
+    private static int qualityScore(GeneratedQuestion question) {
+        int score = 100;
+        int contentLength = question.content().length();
+        score += contentLength >= 15 && contentLength <= 45 ? 10 : -8;
+
+        int shortestOption = question.options().stream().mapToInt(String::length).min().orElse(0);
+        int longestOption = question.options().stream().mapToInt(String::length).max().orElse(0);
+        score += longestOption - shortestOption <= 8 ? 8 : -8;
+        if (question.difficulty() != Question.Difficulty.EASY
+                && question.evidencePhotoIds().size() >= 2) {
+            score += 6;
+        }
+        if (question.referenceInformation().length() >= 10) score += 4;
+        if (question.content().contains("장면에서") || question.content().contains("이때 무엇")) {
+            score -= 10;
+        }
+        return score;
+    }
+
+    private static String inferTopic(GeneratedQuestion question) {
+        String text = (question.content() + " " + question.referenceInformation())
+                .toLowerCase(Locale.ROOT);
+        if (containsAny(text, "순서", "먼저", "이후", "전후", "흐름", "준비", "마무리")) {
+            return "TIMELINE";
+        }
+        if (containsAny(text, "음식", "먹", "식사", "마신", "음료", "술", "요리")) {
+            return "FOOD_DRINK";
+        }
+        if (containsAny(text, "장소", "랜드마크", "건축물", "방문", "지역")) {
+            return "PLACE";
+        }
+        if (containsAny(text, "색", "색상", "빛깔")) {
+            return "COLOR";
+        }
+        return "ACTIVITY";
+    }
+
+    private static boolean containsAny(String value, String... terms) {
+        for (String term : terms) {
+            if (value.contains(term)) return true;
+        }
+        return false;
     }
 
     private static boolean containsOptionInQuestion(String content, List<String> options) {

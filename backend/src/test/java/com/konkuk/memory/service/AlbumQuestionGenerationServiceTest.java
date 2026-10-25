@@ -13,9 +13,11 @@ class AlbumQuestionGenerationServiceTest {
 
         assertThat(withoutFixedQuestions.minAiQuestions()).isEqualTo(8);
         assertThat(withoutFixedQuestions.maxAiQuestions()).isEqualTo(10);
+        assertThat(withoutFixedQuestions.candidateAiQuestions()).isEqualTo(12);
         assertThat(withoutFixedQuestions.maxTotalQuestions()).isEqualTo(10);
         assertThat(withTwoFixedQuestions.minAiQuestions()).isEqualTo(6);
         assertThat(withTwoFixedQuestions.maxAiQuestions()).isEqualTo(8);
+        assertThat(withTwoFixedQuestions.candidateAiQuestions()).isEqualTo(10);
     }
 
     @Test
@@ -25,8 +27,10 @@ class AlbumQuestionGenerationServiceTest {
 
         assertThat(withoutFixedQuestions.minAiQuestions()).isEqualTo(10);
         assertThat(withoutFixedQuestions.maxAiQuestions()).isEqualTo(11);
+        assertThat(withoutFixedQuestions.candidateAiQuestions()).isEqualTo(13);
         assertThat(withoutFixedQuestions.maxTotalQuestions()).isEqualTo(13);
         assertThat(withTwoFixedQuestions.minAiQuestions()).isEqualTo(8);
         assertThat(withTwoFixedQuestions.maxAiQuestions()).isEqualTo(11);
+        assertThat(withTwoFixedQuestions.candidateAiQuestions()).isEqualTo(13);
     }
 }

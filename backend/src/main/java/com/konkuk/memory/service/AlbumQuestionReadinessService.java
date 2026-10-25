@@ -24,6 +24,7 @@ public class AlbumQuestionReadinessService {
 
     static final int MIN_SUITABILITY_SCORE = 60;
     static final int MIN_DISTINCT_SCENES = 6;
+    static final int MIN_TOPIC_TYPES = 2;
     private static final String TOPIC_ACTIVITY = "ACTIVITY";
     private static final String TOPIC_FOOD_DRINK = "FOOD_DRINK";
     private static final String TOPIC_PLACE = "PLACE";
@@ -77,6 +78,17 @@ public class AlbumQuestionReadinessService {
                             + "회상 퀴즈를 만들려면 활동·음식·장소처럼 서로 다른 장면의 사진을 "
                             + additionalRequired + "개 이상 더 추가해주세요. "
                             + recommendation
+            );
+        }
+        long primaryTopicCount = availableTopics.stream()
+                .filter(topic -> !TOPIC_TIMELINE.equals(topic))
+                .count();
+        if (primaryTopicCount < MIN_TOPIC_TYPES) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "QUESTION_PHOTO_DIVERSITY_INSUFFICIENT",
+                    "대표 장면은 " + sceneCount + "개지만 질문 주제가 한 종류에 집중되어 있습니다. "
+                            + buildRecommendation(availableTopics, 2)
             );
         }
 
@@ -255,9 +267,25 @@ public class AlbumQuestionReadinessService {
     }
 
     private static String normalizeSceneKey(String value) {
-        return clean(value)
+        String normalized = clean(value)
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^가-힣a-z0-9]", "");
+        return normalized
+                .replace("불멍", "모닥불")
+                .replace("불꽃", "모닥불")
+                .replace("캠프파이어", "모닥불")
+                .replace("술마시기", "음료")
+                .replace("술마시는", "음료")
+                .replace("음료마시기", "음료")
+                .replace("식사하기", "식사")
+                .replace("식사하는", "식사")
+                .replace("관람", "")
+                .replace("방문", "")
+                .replace("감상", "")
+                .replace("하는장면", "")
+                .replace("장면", "")
+                .replace("모습", "")
+                .replace("하기", "");
     }
 
     private static String clean(String value) {

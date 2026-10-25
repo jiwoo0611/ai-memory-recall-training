@@ -31,6 +31,7 @@ public class GeminiPhotoAnalysisClient {
     private static final Logger log = LoggerFactory.getLogger(GeminiPhotoAnalysisClient.class);
 
     private static final String PROVIDER = "google-gemini";
+    static final String ANALYSIS_VERSION = "photo-recall-v2";
     private static final Set<String> CONFIDENCE_VALUES =
             Set.of("HIGH", "MEDIUM", "LOW");
 
@@ -328,6 +329,7 @@ public class GeminiPhotoAnalysisClient {
         copyStringArray(source, stored, "questionClues");
         copyStringArray(source, stored, "uncertainties");
         copyQuestionSuitability(source, stored);
+        stored.put("analysisVersion", ANALYSIS_VERSION);
         stored.put("provider", PROVIDER);
         stored.put("model", model);
         stored.put("analyzedAt", Instant.now().toString());

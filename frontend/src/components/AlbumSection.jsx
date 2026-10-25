@@ -3,6 +3,8 @@ import { api } from "../api/client";
 import { Empty } from "./UI";
 import PhotoImage from "./PhotoImage";
 
+const PHOTO_ANALYSIS_VERSION = "photo-recall-v2";
+
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("ko-KR");
@@ -14,6 +16,7 @@ function hasQuestionSuitability(aiClues) {
   try {
     const parsed = JSON.parse(aiClues);
     return (
+      parsed.analysisVersion === PHOTO_ANALYSIS_VERSION &&
       Number.isFinite(parsed.questionSuitability?.score) &&
       Boolean(parsed.questionSuitability?.sceneKey?.trim())
     );

@@ -57,7 +57,8 @@ public class AlbumQuestionGenerationService {
                     context.evidenceJson(),
                     context.photoIds(),
                     plan.minAiQuestions(),
-                    plan.maxAiQuestions()
+                    plan.maxAiQuestions(),
+                    plan.candidateAiQuestions()
             ));
             var limited = generated.stream().limit(plan.maxTotalQuestions()).toList();
 
@@ -81,12 +82,19 @@ public class AlbumQuestionGenerationService {
         int targetMax = eligibleSceneCount >= 8 ? 13 : 10;
         int minAi = Math.max(6, targetMin - deterministicQuestionCount);
         int maxAi = Math.min(11, targetMax - deterministicQuestionCount);
-        return new QuestionPlan(Math.min(minAi, maxAi), maxAi, targetMax);
+        int candidateAi = Math.min(13, maxAi + 2);
+        return new QuestionPlan(
+                Math.min(minAi, maxAi),
+                maxAi,
+                candidateAi,
+                targetMax
+        );
     }
 
     record QuestionPlan(
             int minAiQuestions,
             int maxAiQuestions,
+            int candidateAiQuestions,
             int maxTotalQuestions
     ) {}
 }

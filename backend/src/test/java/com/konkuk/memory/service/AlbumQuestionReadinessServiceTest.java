@@ -20,7 +20,7 @@ class AlbumQuestionReadinessServiceTest {
         PhotoRepository photos = mock(PhotoRepository.class);
         List<Photo> albumPhotos = List.of(
                 photo(1L, 85, "모닥불 감상", "activity"),
-                photo(2L, 70, "모닥불 감상", "activity"),
+                photo(2L, 70, "불멍", "activity"),
                 photo(3L, 80, "저녁 식사", "food"),
                 photo(4L, 75, "산책", "timeline"),
                 photo(5L, 90, "랜드마크 관람", "landmark"),
@@ -38,6 +38,29 @@ class AlbumQuestionReadinessServiceTest {
         assertThat(readiness.eligiblePhotoIds()).containsExactlyInAnyOrder(
                 1L, 3L, 4L, 5L, 6L, 7L
         );
+    }
+
+    @Test
+    void asksForAnotherPhotoTypeWhenEnoughScenesCoverOnlyOneTopic() {
+        PhotoRepository photos = mock(PhotoRepository.class);
+        List<Photo> albumPhotos = List.of(
+                photo(1L, 85, "산책 시작", "activity", "timeline"),
+                photo(2L, 80, "자전거 타기", "activity"),
+                photo(3L, 75, "모닥불", "activity"),
+                photo(4L, 82, "텐트 설치", "activity"),
+                photo(5L, 79, "짐 정리", "activity"),
+                photo(6L, 88, "공놀이", "activity")
+        );
+        when(photos.findAllByAlbum_IdAndUser_IdOrderByCreatedAtAsc(7L, 3L))
+                .thenReturn(albumPhotos);
+
+        var service = new AlbumQuestionReadinessService(photos, new ObjectMapper());
+
+        assertThatThrownBy(() -> service.requireReady(3L, 7L))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("대표 장면은 6개")
+                .hasMessageContaining("한 종류에 집중")
+                .hasMessageContaining("음식·음료 사진");
     }
 
     @Test

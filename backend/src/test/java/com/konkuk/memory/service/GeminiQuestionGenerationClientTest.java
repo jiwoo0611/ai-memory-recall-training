@@ -41,13 +41,53 @@ class GeminiQuestionGenerationClientTest {
         assertThat(questions.get(0).verifiable()).isTrue();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v7");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v8");
     }
 
     @Test
     void supportsSixQuestionPlanForAlbumsWithFewerRepresentativeScenes() throws Exception {
         assertThat(client.normalize(validOutput(6), Set.of(11L, 12L), 6, 8))
                 .hasSize(6);
+    }
+
+    @Test
+    void removesDuplicateAnswersFromExtraCandidatesBeforeSelection() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(9));
+        ObjectNode duplicate = (ObjectNode) root.path("questions").path(8);
+        duplicate.set("options", objectMapper.valueToTree(new String[]{
+                "정답 1", "새 오답 A", "새 오답 B", "새 오답 C"
+        }));
+
+        assertThat(client.normalize(
+                root.toString(),
+                Set.of(11L, 12L),
+                8,
+                8,
+                9
+        )).hasSize(8);
+    }
+
+    @Test
+    void limitsQuestionsThatDependOnTheSamePhotoWhenEnoughPhotosExist() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(10));
+        for (int index = 6; index < 10; index++) {
+            ((ObjectNode) root.path("questions").path(index)).set(
+                    "evidencePhotoIds",
+                    objectMapper.valueToTree(new Long[]{12L + (index - 6)})
+            );
+        }
+
+        var selected = client.normalize(
+                root.toString(),
+                Set.of(11L, 12L, 13L, 14L, 15L, 16L),
+                6,
+                8,
+                10
+        );
+
+        assertThat(selected).hasSizeBetween(6, 8);
+        assertThat(selected.stream().filter(question -> question.evidencePhotoIds().contains(11L)))
+                .hasSizeLessThanOrEqualTo(2);
     }
 
     @Test

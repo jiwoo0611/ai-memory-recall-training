@@ -68,6 +68,8 @@ class GeminiPhotoAnalysisClientTest {
                 .isEqualTo(82);
         assertThat(stored.path("questionSuitability").path("sceneKey").asText())
                 .isEqualTo("김치찌개 식사");
+        assertThat(stored.path("analysisVersion").asText())
+                .isEqualTo("photo-recall-v2");
         assertThat(stored.path("provider").asText())
                 .isEqualTo("google-gemini");
         assertThat(stored.path("model").asText())
