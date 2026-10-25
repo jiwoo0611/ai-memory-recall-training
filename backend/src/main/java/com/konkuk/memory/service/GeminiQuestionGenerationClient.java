@@ -243,6 +243,7 @@ public class GeminiQuestionGenerationClient {
         }
         validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
         validateDifficultyQuota(difficultyQuota, minQuestions, maxQuestions);
+        Set<String> albumFacts = extractAlbumFacts(evidenceJson);
 
         String requestPrompt = PROMPT
                 + "\n이번 응답에는 서로 다른 후보 질문을 " + candidateQuestions + "개 생성하세요."
@@ -277,7 +278,8 @@ public class GeminiQuestionGenerationClient {
                         minQuestions,
                         maxQuestions,
                         candidateQuestions,
-                        difficultyQuota
+                        difficultyQuota,
+                        albumFacts
                 );
             } catch (JsonProcessingException ex) {
                 lastInvalidResponse = invalidResponse();
@@ -361,7 +363,8 @@ public class GeminiQuestionGenerationClient {
                 minQuestions,
                 maxQuestions,
                 candidateQuestions,
-                null
+                null,
+                Set.of()
         );
     }
 
@@ -372,6 +375,26 @@ public class GeminiQuestionGenerationClient {
             int maxQuestions,
             int candidateQuestions,
             DifficultyQuota difficultyQuota
+    ) throws JsonProcessingException {
+        return normalize(
+                output,
+                allowedPhotoIds,
+                minQuestions,
+                maxQuestions,
+                candidateQuestions,
+                difficultyQuota,
+                Set.of()
+        );
+    }
+
+    List<GeneratedQuestion> normalize(
+            String output,
+            Set<Long> allowedPhotoIds,
+            int minQuestions,
+            int maxQuestions,
+            int candidateQuestions,
+            DifficultyQuota difficultyQuota,
+            Set<String> albumFacts
     ) throws JsonProcessingException {
         validateQuestionRange(minQuestions, maxQuestions, candidateQuestions);
         validateDifficultyQuota(difficultyQuota, minQuestions, maxQuestions);
@@ -470,6 +493,7 @@ public class GeminiQuestionGenerationClient {
                     || correctOptionIndex >= options.size()
                     || normalizedAnswer.isBlank()
                     || containsOptionInQuestion(content, options)
+                    || containsAlbumFactDistractor(options, correctOptionIndex, albumFacts)
                     || evidencePhotoIds.isEmpty()
                     || reference.isBlank()) {
                 continue;
@@ -491,7 +515,7 @@ public class GeminiQuestionGenerationClient {
                 }
             }
 
-            result.add(new GeneratedQuestion(
+            GeneratedQuestion candidate = new GeneratedQuestion(
                     content,
                     type,
                     difficulty,
@@ -500,8 +524,13 @@ public class GeminiQuestionGenerationClient {
                     List.copyOf(evidencePhotoIds),
                     List.copyOf(displayPhotoIds),
                     true,
-                    reference
-            ));
+                    reference,
+                    0
+            );
+            if (result.stream().anyMatch(existing -> semanticallyDuplicates(existing, candidate))) {
+                continue;
+            }
+            result.add(candidate);
         }
 
         List<GeneratedQuestion> selected = selectHighQualityQuestions(
@@ -513,11 +542,13 @@ public class GeminiQuestionGenerationClient {
         if (selected.size() < minQuestions) {
             throw invalidResponse();
         }
-        return List.copyOf(selected);
+        return selected.stream()
+                .map(question -> question.withQualityScore(qualityScore(question)))
+                .toList();
     }
 
     public String generationVersion() {
-        return model + ":album-recall-mcq-v9";
+        return model + ":album-recall-mcq-v10";
     }
 
     private static void validateQuestionRange(
@@ -649,6 +680,112 @@ public class GeminiQuestionGenerationClient {
             score -= 10;
         }
         return score;
+    }
+
+    private Set<String> extractAlbumFacts(String evidenceJson) {
+        Set<String> facts = new LinkedHashSet<>();
+        try {
+            JsonNode photos = objectMapper.readTree(evidenceJson).path("photos");
+            if (!photos.isArray()) return Set.of();
+            for (JsonNode photo : photos) {
+                addFact(facts, photo.path("location").path("value").asText(""));
+                JsonNode clues = photo.path("aiClues").path("value");
+                addNamedFacts(facts, clues.path("foods"));
+                addNamedFacts(facts, clues.path("landmarks"));
+                for (String field : List.of("objects", "activities", "questionClues")) {
+                    JsonNode values = clues.path(field);
+                    if (values.isArray()) {
+                        values.forEach(value -> addFact(facts, value.asText("")));
+                    }
+                }
+            }
+        } catch (JsonProcessingException ignored) {
+            return Set.of();
+        }
+        return Set.copyOf(facts);
+    }
+
+    private static void addNamedFacts(Set<String> facts, JsonNode values) {
+        if (!values.isArray()) return;
+        values.forEach(value -> addFact(facts, value.path("name").asText("")));
+    }
+
+    private static void addFact(Set<String> facts, String value) {
+        String normalized = normalizeForComparison(value);
+        if (normalized.length() >= 2) facts.add(normalized);
+    }
+
+    private static boolean containsAlbumFactDistractor(
+            List<String> options,
+            int correctOptionIndex,
+            Set<String> albumFacts
+    ) {
+        if (albumFacts == null || albumFacts.isEmpty()) return false;
+        Set<String> normalizedFacts = new HashSet<>();
+        albumFacts.forEach(fact -> addFact(normalizedFacts, fact));
+        for (int index = 0; index < options.size(); index++) {
+            if (index == correctOptionIndex) continue;
+            String option = normalizeForComparison(options.get(index));
+            if (normalizedFacts.stream().anyMatch(fact -> substantiallyMatches(option, fact))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean substantiallyMatches(String left, String right) {
+        if (left.equals(right)) return true;
+        if (left.length() < 3 || right.length() < 3) return false;
+        String shorter = left.length() <= right.length() ? left : right;
+        String longer = left.length() > right.length() ? left : right;
+        return longer.contains(shorter)
+                && (double) shorter.length() / longer.length() >= 0.6;
+    }
+
+    private static boolean semanticallyDuplicates(
+            GeneratedQuestion left,
+            GeneratedQuestion right
+    ) {
+        if (!inferTopic(left).equals(inferTopic(right))) return false;
+        if (left.evidencePhotoIds().stream().noneMatch(right.evidencePhotoIds()::contains)) {
+            return false;
+        }
+        Set<String> leftTokens = semanticTokens(left.content());
+        Set<String> rightTokens = semanticTokens(right.content());
+        if (leftTokens.isEmpty() || rightTokens.isEmpty()) return false;
+
+        Set<String> intersection = new HashSet<>(leftTokens);
+        intersection.retainAll(rightTokens);
+        Set<String> union = new HashSet<>(leftTokens);
+        union.addAll(rightTokens);
+        return (double) intersection.size() / union.size() >= 0.6;
+    }
+
+    private static Set<String> semanticTokens(String content) {
+        Set<String> tokens = new LinkedHashSet<>();
+        String cleaned = content.toLowerCase(Locale.ROOT)
+                .replaceAll("[^\\p{L}\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        for (String token : cleaned.split(" ")) {
+            if (token.isBlank() || isQuestionStopToken(token)) continue;
+            if (containsAny(token, "마시", "마신", "마셨", "마실", "음료", "술")) tokens.add("DRINK");
+            else if (containsAny(token, "먹", "음식", "식사", "요리")) tokens.add("FOOD");
+            else if (containsAny(token, "방문", "장소", "지역", "건축물", "랜드마크")) tokens.add("PLACE");
+            else if (containsAny(token, "순서", "먼저", "이후", "전후", "흐름")) tokens.add("TIMELINE");
+            else if (containsAny(token, "색", "빛깔")) tokens.add("COLOR");
+            else if (token.contains("종류")) tokens.add("TYPE");
+            else tokens.add(token);
+        }
+        return tokens;
+    }
+
+    private static boolean isQuestionStopToken(String token) {
+        return containsAny(
+                token,
+                "무엇", "어떤", "인가요", "었나요", "일까요", "이날", "이때",
+                "앨범", "사진", "장면", "기억", "정답", "알맞은"
+        );
     }
 
     private static String inferTopic(GeneratedQuestion question) {
@@ -808,8 +945,24 @@ public class GeminiQuestionGenerationClient {
             List<Long> evidencePhotoIds,
             List<Long> displayPhotoIds,
             boolean verifiable,
-            String referenceInformation
-    ) {}
+            String referenceInformation,
+            int qualityScore
+    ) {
+        GeneratedQuestion withQualityScore(int score) {
+            return new GeneratedQuestion(
+                    content,
+                    type,
+                    difficulty,
+                    options,
+                    correctOptionIndex,
+                    evidencePhotoIds,
+                    displayPhotoIds,
+                    verifiable,
+                    referenceInformation,
+                    score
+            );
+        }
+    }
 
     record DifficultyQuota(int easy, int medium, int hard) {
         int total() {

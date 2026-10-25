@@ -7,6 +7,7 @@ import com.konkuk.memory.entity.Question;
 import com.konkuk.memory.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,9 +40,10 @@ class GeminiQuestionGenerationClientTest {
                 .hasSize(1);
         assertThat(questions.get(2).displayPhotoIds()).isEmpty();
         assertThat(questions.get(0).verifiable()).isTrue();
+        assertThat(questions.get(0).qualityScore()).isPositive();
         assertThat(questions.get(1).type()).isEqualTo(Question.Type.CONTEXT);
         assertThat(client.generationVersion())
-                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v9");
+                .isEqualTo("gemini-3.5-flash-lite:album-recall-mcq-v10");
     }
 
     @Test
@@ -90,6 +92,48 @@ class GeminiQuestionGenerationClientTest {
                 8,
                 9
         )).hasSize(8);
+    }
+
+    @Test
+    void removesSemanticallyDuplicateQuestionsFromTheSameEvidence() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(9));
+        ((ObjectNode) root.path("questions").path(8))
+                .put("content", "이날 마신 음료 종류는 무엇인가요?")
+                .put("difficulty", "MEDIUM");
+
+        var selected = client.normalize(
+                root.toString(),
+                Set.of(11L, 12L),
+                8,
+                8,
+                9
+        );
+
+        assertThat(selected).hasSize(8);
+        assertThat(selected).noneMatch(question ->
+                question.content().equals("이날 마신 음료 종류는 무엇인가요?"));
+    }
+
+    @Test
+    void removesQuestionWhenDistractorIsAnotherAlbumFact() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.readTree(validOutput(9));
+        ((ObjectNode) root.path("questions").path(0)).set(
+                "options",
+                objectMapper.valueToTree(new String[]{"정답 1", "피자", "오답 1-B", "오답 1-C"})
+        );
+
+        var selected = client.normalize(
+                root.toString(),
+                Set.of(11L, 12L),
+                8,
+                8,
+                9,
+                null,
+                Set.of("피자")
+        );
+
+        assertThat(selected).hasSize(8);
+        assertThat(selected).noneMatch(question -> question.content().startsWith("장면 1에서"));
     }
 
     @Test
@@ -233,12 +277,27 @@ class GeminiQuestionGenerationClientTest {
     }
 
     private String validOutput(int count) throws Exception {
+        List<String> contents = List.of(
+                "장면 1에서 함께 준비한 음식은 무엇인가요?",
+                "캠핑에서 마셨던 술의 종류는 무엇인가요?",
+                "도착한 뒤 가장 먼저 한 활동은 무엇인가요?",
+                "불꽃의 중심 색상은 무엇이었나요?",
+                "이날 방문한 대표 장소는 어디였나요?",
+                "식사를 마친 뒤 이어진 일은 무엇인가요?",
+                "준비 과정에서 사용한 도구는 무엇인가요?",
+                "주변에서 기억에 남은 자연 풍경은 무엇이었나요?",
+                "목적지까지 이동할 때 이용한 것은 무엇인가요?",
+                "활동을 하던 날의 날씨는 어땠나요?",
+                "함께 즐긴 놀이의 종류는 무엇이었나요?",
+                "체험할 때 필요했던 장비는 무엇인가요?",
+                "하루를 마무리하며 했던 일은 무엇인가요?"
+        );
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode questions = root.putArray("questions");
         for (int index = 0; index < count; index++) {
             int number = index + 1;
             ObjectNode question = questions.addObject();
-            question.put("content", "장면 " + number + "에서 함께 준비한 음식은 무엇인가요?");
+            question.put("content", contents.get(index));
             question.put("type", index % 2 == 0 ? "PHOTO_CLUE" : "CONTEXT");
             question.put("difficulty", index < 3 ? "EASY" : index < 6 ? "MEDIUM" : "HARD");
             question.set("options", objectMapper.valueToTree(new String[]{

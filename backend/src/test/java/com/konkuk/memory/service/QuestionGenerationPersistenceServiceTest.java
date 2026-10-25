@@ -34,7 +34,8 @@ class QuestionGenerationPersistenceServiceTest {
                 fullAlbumJson,
                 List.of(2L, 5L),
                 List.of(5L),
-                Question.Difficulty.HARD
+                Question.Difficulty.HARD,
+                126
         );
         var snapshot = objectMapper.readTree(snapshotJson);
 
@@ -45,6 +46,7 @@ class QuestionGenerationPersistenceServiceTest {
         assertThat(snapshot.path("evidencePhotoIds").toString()).isEqualTo("[2,5]");
         assertThat(snapshot.path("displayPhotoIds").toString()).isEqualTo("[5]");
         assertThat(snapshot.path("difficulty").asText()).isEqualTo("HARD");
+        assertThat(snapshot.path("qualityScore").asInt()).isEqualTo(126);
         assertThat(snapshotJson.length()).isLessThan(fullAlbumJson.length() / 2);
     }
 }

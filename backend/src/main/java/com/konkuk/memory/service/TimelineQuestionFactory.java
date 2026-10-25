@@ -89,7 +89,8 @@ public class TimelineQuestionFactory {
                     selected.stream().map(TimedClue::photoId).toList(),
                     List.of(),
                     true,
-                    reference
+                    reference,
+                    120
             ));
         } catch (JsonProcessingException ex) {
             return Optional.empty();

@@ -38,7 +38,7 @@ class AlbumQuestionGenerationServiceTest {
         return new GeminiQuestionGenerationClient.GeneratedQuestion(
                 "질문?", Question.Type.CONTEXT, difficulty,
                 List.of("1", "2", "3", "4"), 0,
-                List.of(1L), List.of(), true, "근거"
+                List.of(1L), List.of(), true, "근거", 120
         );
     }
 }

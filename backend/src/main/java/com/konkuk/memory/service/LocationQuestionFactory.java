@@ -63,7 +63,8 @@ public class LocationQuestionFactory {
                     location.getValue().stream().limit(4).toList(),
                     List.of(),
                     true,
-                    "사진 GPS 메타데이터에서 확인된 촬영 지역: " + correctRegion
+                    "사진 GPS 메타데이터에서 확인된 촬영 지역: " + correctRegion,
+                    120
             ));
         } catch (JsonProcessingException ex) {
             return Optional.empty();
