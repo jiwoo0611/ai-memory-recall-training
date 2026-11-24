@@ -17,7 +17,9 @@ public class DelayedRecallController {
     @GetMapping("/users/me/delayed-recalls/access")
     public Map<String,Boolean> access(@AuthenticationPrincipal Jwt jwt) { return Map.of("canReview",service.canReview(user(jwt))); }
     @GetMapping("/users/me/delayed-recalls")
-    public List<View> list(@AuthenticationPrincipal Jwt jwt) { return service.list(user(jwt)); }
+    public List<View> list(@AuthenticationPrincipal Jwt jwt, @RequestParam(required=false) Long albumId) {
+        return albumId == null ? service.list(user(jwt)) : service.listForAlbum(user(jwt),albumId);
+    }
     @GetMapping("/users/me/delayed-recalls/{id}")
     public View get(@AuthenticationPrincipal Jwt jwt,@PathVariable long id) { return service.get(user(jwt),id); }
     @GetMapping("/users/me/training-sessions/{id}/delayed-recall")
@@ -37,3 +39,4 @@ public class DelayedRecallController {
     @PostMapping("/review/delayed-recalls/{id}/grade")
     public View grade(@AuthenticationPrincipal Jwt jwt,@PathVariable long id,@Valid @RequestBody Grade request) { return service.grade(user(jwt),id,request); }
 }
+

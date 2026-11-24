@@ -101,6 +101,11 @@ public class DelayedRecallService {
         return rows("WHERE p.user_id=? ORDER BY d.id DESC",userId).stream().map(r->view(r,false,false)).toList();
     }
     @Transactional(readOnly=true)
+    public List<View> listForAlbum(long userId, long albumId) {
+        return rows("WHERE p.user_id=? AND p.album_id=? ORDER BY d.id DESC",userId,albumId)
+            .stream().map(r->view(r,false,false)).toList();
+    }
+    @Transactional(readOnly=true)
     public View get(long userId,long id) { return view(owned(userId,id,false),false,true); }
     @Transactional(readOnly=true)
     public View forSession(long userId,long sessionId) {
@@ -179,3 +184,4 @@ public class DelayedRecallService {
         return review(userId,id);
     }
 }
+

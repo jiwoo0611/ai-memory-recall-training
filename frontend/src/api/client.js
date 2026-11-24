@@ -231,7 +231,8 @@ async function photoImage(albumId, photoId, signal) {
   return response.blob();
 }
 
-async function uploadPhotos(files) {
+async function uploadPhotos(albumId, files) {
+  if (!albumId) throw new Error("사진을 업로드할 앨범을 먼저 선택해주세요.");
   const sizeError = validateUploadSizes(Array.from(files));
   if (sizeError) throw new Error(sizeError);
   const token = current?.accessToken;
@@ -256,7 +257,7 @@ async function uploadPhotos(files) {
 
   try {
     response = await fetch(
-      `${API_BASE_URL}/api/photos/upload`,
+      `${API_BASE_URL}/api/albums/${encodeURIComponent(albumId)}/photos`,
       {
         method: "POST",
         headers: {
@@ -303,7 +304,7 @@ async function uploadPhotos(files) {
 }
 
 export const api = {
-  delayedRecalls: (signal) => request('/api/users/me/delayed-recalls', { signal }),
+  delayedRecalls: (signal, albumId) => request(`/api/users/me/delayed-recalls${albumId ? `?albumId=${encodeURIComponent(albumId)}` : ''}`, { signal }),
   delayedAccess: (signal) => request('/api/users/me/delayed-recalls/access', { signal }),
   delayedForSession: (id, signal) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/delayed-recall`, { signal }),
   enrollDelayed: (id, body) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/delayed-recall`, { method: 'POST', body }),
@@ -469,4 +470,5 @@ export const api = {
       },
     ),
 };
+
 

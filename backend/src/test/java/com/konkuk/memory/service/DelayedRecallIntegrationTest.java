@@ -73,6 +73,15 @@ class DelayedRecallIntegrationTest {
     void complete(Instant at){entityManager.flush();db.update("UPDATE training_sessions SET started_at=?,completed_at=?,status='COMPLETED' WHERE id=?",Timestamp.from(at.minusSeconds(100)),Timestamp.from(at),sessionId);entityManager.clear();}
     String path(){return "/api/users/me/delayed-recalls/"+id;}
     String body(Object x)throws Exception{return json.writeValueAsString(x);}
+    @Test void albumListOnlyReturnsOwnedEvaluationsFromThatAlbum() throws Exception {
+        long albumId=photos.findById(photoId).orElseThrow().getAlbum().getId();
+        var otherAlbum=albums.saveAndFlush(new Album(users.findById(userId).orElseThrow(),"같은 지역 다른 여행"));
+        assertThat(service.listForAlbum(userId,albumId)).extracting(DelayedRecallService.View::id).containsExactly(id);
+        assertThat(service.listForAlbum(userId,otherAlbum.getId())).isEmpty();
+        assertThat(service.listForAlbum(otherId,albumId)).isEmpty();
+        mvc.perform(get("/api/users/me/delayed-recalls").param("albumId",Long.toString(otherAlbum.getId()))
+            .header("Authorization","Bearer "+token)).andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
     @Test void exactSevenDayBoundaryAndNoReferenceLeak() throws Exception {
         complete(now.minus(Duration.ofDays(7)).plusNanos(1000));
         assertThat(deterministic.get(userId,id).status()).isEqualTo("NOT_DUE");
@@ -139,3 +148,4 @@ class DelayedRecallIntegrationTest {
         assertThat(db.queryForObject("SELECT COUNT(*) FROM delayed_recall_facts WHERE delayed_recall_id=?",Integer.class,id)).isZero();
     }
 }
+

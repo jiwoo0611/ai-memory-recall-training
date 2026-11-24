@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
       albums = albums.map(item => item.id === 1 ? updated : item);
       return route.fulfill({ json: updated });
     }
-    if (path === "/api/photos/upload" && route.request().method() === "POST") {
+    if (path === "/api/albums/1/photos" && route.request().method() === "POST") {
       expect(route.request().headers()["content-type"]).toContain("multipart/form-data");
       const uploaded = { ...photo, id: 4, originalFilename: "추가.png" };
       photos = [...photos, uploaded];
@@ -56,6 +56,8 @@ test.beforeEach(async ({ page }) => {
       "/api/users/me/training-sessions": { content: [], totalElements: 0, totalPages: 0 },
       "/api/albums": albums,
       "/api/albums/1": album,
+      "/api/albums/3": albums.find(item => item.id === 3),
+      "/api/albums/3/photos": [],
       "/api/albums/1/photos": photos,
       "/api/albums/1/photos/2": photo,
       "/api/albums/1/photos/2/analyze": { ...photo, aiClues: '{"questionClues":["새 분석 결과"]}' },
@@ -266,20 +268,23 @@ test("explicit parent links add one entry and back returns the actual previous s
   await expectRouteScreen(page, "/albums/1/photos/2");
 });
 
-test("album creation/deletion and photo upload/deletion do not add navigation entries", async ({ page }) => {
+test("album creation opens its detail; upload/deletion do not add navigation entries", async ({ page }) => {
   await page.goto("/#/login");
   await login(page);
   await page.locator("nav").getByRole("link", { name: "사진 보관함", exact: true }).click();
   const before = await length(page);
   await page.getByPlaceholder("새 앨범 이름").fill("새 여행");
   await page.getByRole("button", { name: "+ 새 앨범", exact: true }).click();
+  await expect(page).toHaveURL(/#\/albums\/3$/);
+  await expect(page.getByRole("heading", { name: "새 여행", exact: true })).toBeVisible();
+  expect(await length(page)).toBe(before + 1);
+  await page.goBack();
   await expect(page.getByRole("link", { name: "새 여행 앨범 열기" })).toHaveAttribute("href", "#/albums/3");
-  expect(await length(page)).toBe(before);
   page.on("dialog", (dialog) => dialog.accept());
   await page.locator("article").filter({ has: page.getByRole("heading", { name: "새 여행", exact: true }) }).getByRole("button", { name: "앨범 삭제" }).click();
   await expect(page.getByRole("link", { name: "새 여행 앨범 열기" })).toHaveCount(0);
   await expectRouteScreen(page, "/albums");
-  expect(await length(page)).toBe(before);
+  expect(await length(page)).toBe(before + 1);
   await page.getByRole("link", { name: "여행 앨범 열기" }).click();
   await expectRouteScreen(page, "/albums/1");
   await page.locator('input[type="file"]').setInputFiles({
@@ -405,4 +410,5 @@ test("mypage retains saved growth, activity and training detail data", async ({ 
   await expect(page.getByLabel("훈련 상세")).toContainText("저장된 훈련 요약");
   await expect(page.getByRole("link", { name: "저장된 결과 보기" })).toHaveAttribute("href", "#/training/7");
 });
+
 

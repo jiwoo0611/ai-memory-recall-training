@@ -7,7 +7,6 @@ import com.konkuk.memory.entity.User;
 import com.konkuk.memory.exception.ApiException;
 import com.konkuk.memory.repository.AlbumRepository;
 import com.konkuk.memory.repository.PhotoRepository;
-import com.konkuk.memory.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,20 +15,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Service
 public class PhotoUploadService {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES =
-            Set.of(
-                    "image/jpeg",
-                    "image/png",
-                    "image/webp"
-            );
-
     private final AlbumRepository albumRepository;
-    private final UserRepository userRepository;
     private final PhotoRepository photoRepository;
 
     private final ImageValidationService imageValidationService;
@@ -38,14 +28,12 @@ public class PhotoUploadService {
 
     public PhotoUploadService(
             AlbumRepository albumRepository,
-            UserRepository userRepository,
             PhotoRepository photoRepository,
             ImageValidationService imageValidationService,
             PhotoMetadataService photoMetadataService,
             FileStorageService fileStorageService
     ) {
         this.albumRepository = albumRepository;
-        this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.imageValidationService = imageValidationService;
         this.photoMetadataService = photoMetadataService;
@@ -55,6 +43,7 @@ public class PhotoUploadService {
     @Transactional
     public List<Long> upload(
             Long userId,
+            Long albumId,
             List<MultipartFile> files
     ) {
 
@@ -66,12 +55,13 @@ public class PhotoUploadService {
             );
         }
 
-        User user = userRepository.findById(userId)
+        // Resolve the explicitly chosen album before storing any files. Location is
+        // photo metadata only and must never select or create an album.
+        Album album = albumRepository.findByIdAndUser_Id(albumId, userId)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.BAD_REQUEST,
-                        "USER_NOT_FOUND",
-                        "사용자를 찾을 수 없습니다."
+                        HttpStatus.NOT_FOUND, "ALBUM_NOT_FOUND", "앨범을 찾을 수 없습니다."
                 ));
+        User user = album.getUser();
 
         List<String> storedFiles = new ArrayList<>();
         List<Photo> photos = new ArrayList<>();
@@ -86,25 +76,6 @@ public class PhotoUploadService {
                 // 2. 사진 메타데이터 추출
                 PhotoMetadata metadata =
                         photoMetadataService.extract(file);
-
-                // 3. 위치 정보 가져오기
-                String location = metadata.location();
-
-                if (location == null || location.isBlank()) {
-                    location = "위치 정보 없음";
-                }
-
-                // 4. 위치 이름으로 기존 앨범 찾기
-                // 없으면 새로운 앨범 생성
-                String albumTitle = location;
-
-                Album album = albumRepository
-                        .findByUser_IdAndTitle(userId, albumTitle)
-                        .orElseGet(() ->
-                                albumRepository.save(
-                                        new Album(user, albumTitle)
-                                )
-                        );
 
                 // 5. 파일 확장자 결정
                 String extension =
@@ -186,3 +157,4 @@ public class PhotoUploadService {
         return ".jpg";
     }
 }
+
