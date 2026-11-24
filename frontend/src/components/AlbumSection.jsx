@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { UPLOAD_HINT } from "../api/uploadLimits";
 import { Empty } from "./UI";
 import PhotoImage from "./PhotoImage";
+import DelayedRecallSection from "./DelayedRecallSection";
 
 const PHOTO_ANALYSIS_VERSION = "photo-recall-v2";
 
@@ -142,6 +143,7 @@ export default function AlbumSection({ albumId }) {
       ]);
 
       setAlbumTitle("");
+      location.hash = `#/albums/${encodeURIComponent(newAlbum.id)}`;
     } catch (err) {
       setError(
         err.message || "앨범 생성에 실패했습니다.",
@@ -151,19 +153,11 @@ export default function AlbumSection({ albumId }) {
     }
   };
 
-  /*
-   * 사진 업로드
-   *
-   * 앨범 목록에서 업로드:
-   *   사진 위치 분석 → 자동 앨범 생성 → 앨범 목록 갱신
-   *
-   * 앨범 상세에서 업로드:
-   *   업로드 완료 후 현재 앨범 사진 목록 갱신
-   */
+  // Upload only to the album the user opened.
   const handleUpload = async (event) => {
     const files = Array.from(event.target.files || []);
 
-    if (!files.length) {
+    if (!selectedAlbum || !files.length) {
       return;
     }
 
@@ -172,20 +166,11 @@ export default function AlbumSection({ albumId }) {
       setUploadError("");
 
       setUploadError(`사진 ${files.length}장 저장 중… 파일 크기에 따라 최대 30초 정도 걸릴 수 있습니다.`);
-      await api.uploadPhotos(files);
+      await api.uploadPhotos(selectedAlbum.id, files);
       setUploadError("");
 
-      if (selectedAlbum) {
-        const photos = await api.albumPhotos(
-          selectedAlbum.id,
-        );
-
-        setAlbumPhotos(photos);
-      } else {
-        const updatedAlbums = await api.albums();
-
-        setAlbums(updatedAlbums);
-      }
+      const photos = await api.albumPhotos(selectedAlbum.id);
+      setAlbumPhotos(photos);
     } catch (err) {
       setUploadError(
         err.message || "사진 업로드에 실패했습니다.",
@@ -665,7 +650,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
 
         {!albumPhotos.length ? (
           <Empty>
-            아직 이 앨범에 등록된 사진이 없습니다.
+            아직 이 앨범에 등록된 사진이 없습니다. 위의 ‘+ 사진 추가’를 눌러주세요.
           </Empty>
         ) : (
           <div className="photo-grid">
@@ -833,6 +818,8 @@ const handleUpdateAlbumTitle = async (event, album) => {
           </div>
         )}
 
+        <DelayedRecallSection key={selectedAlbum.id} albumId={selectedAlbum.id} />
+
         <section className="album-question-panel">
           <div className="section-heading">
             <div>
@@ -979,54 +966,8 @@ const handleUpdateAlbumTitle = async (event, album) => {
         </div>
       </div>
 
-      {/*
-        자동 분류용 사진 업로드
-        여러 장 선택 가능
-      */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginBottom: "24px",
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
+      <p className="hint">여행이나 경험별로 앨범을 먼저 만든 뒤, 앨범 안에서 사진을 추가해주세요. 같은 지역의 사진도 앨범별로 따로 보관됩니다.</p>
 
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() =>
-            fileInputRef.current?.click()
-          }
-        >
-          {uploading
-            ? "업로드 중..."
-            : "+ 사진 추가"}
-        </button>
-      </div>
-
-      <p className="hint">{UPLOAD_HINT}</p>
-      {uploadError && (
-        <p
-          className="error"
-          role="alert"
-        >
-          {uploadError}
-        </p>
-      )}
-
-      {/*
-        기존 수동 앨범 생성 기능
-        자동 분류 테스트가 끝날 때까지 유지
-      */}
       <form
         onSubmit={handleCreateAlbum}
         style={{
@@ -1039,6 +980,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
           type="text"
           value={albumTitle}
           maxLength={10}
+          aria-label="새 앨범 이름"
           placeholder="새 앨범 이름"
           onChange={(event) =>
             setAlbumTitle(
@@ -1197,4 +1139,5 @@ const handleUpdateAlbumTitle = async (event, album) => {
     </section>
   );
 }
+
 

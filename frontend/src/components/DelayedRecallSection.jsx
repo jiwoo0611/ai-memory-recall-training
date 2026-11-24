@@ -15,15 +15,15 @@ export function RecallLink({ item }) {
       : <a className="button" href={`#/delayed-recall/${item.id}`}>{item.status === 'AVAILABLE' ? '회상 평가 시작' : item.status === 'IN_PROGRESS' ? '이어서 작성' : '결과 보기'}</a>}
   </article>;
 }
-export default function DelayedRecallSection() {
+export default function DelayedRecallSection({ albumId }) {
   const [items,setItems]=useState(null), [error,setError]=useState(null), [revision,setRevision]=useState(0), [review,setReview]=useState(false);
-  useEffect(()=>{ const c=new AbortController(); api.delayedRecalls(c.signal).then(setItems).catch(e=>{if(!c.signal.aborted)setError(e);});
-    api.delayedAccess(c.signal).then(x=>setReview(x.canReview)).catch(()=>{}); return ()=>c.abort(); },[revision]);
-  return <section className="card delayed-section" aria-labelledby="delayed-title">
-    <p className="eyebrow">다시 떠올리는 나의 기억</p><h2 id="delayed-title">7일 후 회상 평가</h2>
+  useEffect(()=>{ const c=new AbortController(); api.delayedRecalls(c.signal, albumId).then(setItems).catch(e=>{if(!c.signal.aborted)setError(e);});
+    api.delayedAccess(c.signal).then(x=>setReview(x.canReview)).catch(()=>{}); return ()=>c.abort(); },[revision,albumId]);
+  return <section className="card delayed-section" aria-labelledby={albumId ? `delayed-title-${albumId}` : "delayed-title"}>
+    <p className="eyebrow">다시 떠올리는 나의 기억</p><h2 id={albumId ? `delayed-title-${albumId}` : "delayed-title"}>7일 후 회상 평가</h2>
     <p className="muted">사진과 선택지 없이 기억나는 이야기를 들려주세요.</p>
     <ErrorBox error={error} retry={()=>{setError(null);setRevision(v=>v+1);}} />
-    {items ? items.length ? items.map(item=><RecallLink key={item.id} item={item}/>) : <p>아직 예정된 평가가 없어요. 새 퀴즈의 첫 문항을 풀기 전에 평가 참여를 등록할 수 있어요.</p> : !error && <p role="status">평가 일정을 불러오는 중…</p>}
+    {items ? items.length ? items.map(item=><RecallLink key={item.id} item={item}/>) : <p>{albumId ? "이 앨범에는 아직 예정된 평가가 없어요. 아래에서 새 퀴즈를 시작하면 첫 문항 전에 평가 참여를 등록할 수 있어요." : "아직 예정된 평가가 없어요. 새 퀴즈의 첫 문항을 풀기 전에 평가 참여를 등록할 수 있어요."}</p> : !error && <p role="status">평가 일정을 불러오는 중…</p>}
     {review && <a className="secondary-link" href="#/recall-review">제출된 회상 평가 채점하기</a>}
   </section>;
 }
@@ -49,3 +49,4 @@ export function RecallEnrollment({ sessionId, completed, canEnroll, onContinue }
     {onContinue && (item !== undefined || error) && <button className="button" type="button" disabled={busy} onClick={onContinue}>{item ? '훈련 시작' : '평가 없이 훈련 시작'}</button>}
   </section>;
 }
+
