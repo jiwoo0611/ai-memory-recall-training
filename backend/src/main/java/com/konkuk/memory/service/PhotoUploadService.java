@@ -21,8 +21,6 @@ import java.util.Set;
 @Service
 public class PhotoUploadService {
 
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
-
     private static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of(
                     "image/jpeg",
