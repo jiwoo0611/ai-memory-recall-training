@@ -20,6 +20,7 @@ async function prepare(page, request) {
   expect(response.ok()).toBeTruthy();
   const { sessionId } = await response.json();
   await login(page); await page.goto(`/#/training/${sessionId}`);
+  await page.getByRole("button", { name: "평가 없이 훈련 시작", exact: true }).click();
   await expect(page.getByRole("heading", { name: "앨범 회상 퀴즈", exact: true })).toBeVisible();
   return { sessionId, headers };
 }
@@ -55,6 +56,7 @@ test("real DB result survives reload and login; retraining preserves old session
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.getByRole("button", { name: "같은 사진으로 새 훈련", exact: true }).click();
+  await page.getByRole("button", { name: "평가 없이 훈련 시작", exact: true }).click();
   await expect(page.getByRole("heading", { name: "앨범 회상 퀴즈", exact: true })).toBeVisible();
   expect(page.url()).not.toContain(`/training/${sessionId}`);
   const saved = await (await request.get(`${backend}/api/users/me/training-sessions/${sessionId}`, { headers })).json();

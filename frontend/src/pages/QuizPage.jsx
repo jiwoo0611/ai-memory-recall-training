@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import PhotoImage from "../components/PhotoImage";
+import { RecallEnrollment } from "../components/DelayedRecallSection";
 import { date, Badge, ErrorBox, Pager } from "../components/UI";
 
 const feedbackLabels = { PENDING: "생성 대기", PROCESSING: "생성 중", COMPLETED: "생성 완료", FAILED: "생성 실패" };
@@ -42,6 +43,7 @@ export default function QuizPage({ albumId, sessionId }) {
   const [historyRevision, setHistoryRevision] = useState(0);
   const actionLock = useRef(false);
   const retryKey = useRef(null);
+  const [recallReady, setRecallReady] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -244,6 +246,7 @@ export default function QuizPage({ albumId, sessionId }) {
         </section>
         <ErrorBox error={submissionError} />
 
+        <RecallEnrollment sessionId={sessionId} completed canEnroll={false} />
         <div className="quiz-complete-actions">
           <button
             className="button"
@@ -271,6 +274,12 @@ export default function QuizPage({ albumId, sessionId }) {
   }
 
   if (session.status !== "IN_PROGRESS") return <section className="card"><Badge value={session.status} /><p>현재 상태에서는 퀴즈를 제출할 수 없습니다.</p><a href="#/mypage">훈련 이력 보기</a></section>;
+
+  if (!recallReady) return <section className="card quiz-page">
+    <a className="back-link" href="#/mypage">← 마이페이지</a><h1>훈련 시작 전 안내</h1>
+    <p>원한다면 이번 훈련을 마친 7일 후, 사진 없이 기억을 떠올리는 평가에 참여할 수 있어요. 참여하지 않아도 퀴즈를 진행할 수 있어요.</p>
+    <RecallEnrollment sessionId={sessionId} completed={false} canEnroll onContinue={() => setRecallReady(true)} />
+  </section>;
 
   const question = questions[currentIndex];
   const selectedOption = answers[question.id];

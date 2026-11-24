@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import DelayedRecallSection from "../components/DelayedRecallSection";
 import {
   Badge,
   date,
@@ -376,6 +377,7 @@ export default function MyPage() {
           )}
         </LoadState>
       </section>
+      <DelayedRecallSection />
       <GrowthStats state={stats} />
 
       <div className="dashboard">
@@ -562,3 +564,4 @@ export default function MyPage() {
     </>
   );
 }
+
