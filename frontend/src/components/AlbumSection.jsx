@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { UPLOAD_HINT } from "../api/uploadLimits";
 import { Empty } from "./UI";
 import PhotoImage from "./PhotoImage";
 
@@ -652,6 +653,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
           </div>
         </div>
 
+        <p className="hint">{UPLOAD_HINT}</p>
         {uploadError && (
           <p
             className="error"
@@ -1011,6 +1013,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
         </button>
       </div>
 
+      <p className="hint">{UPLOAD_HINT}</p>
       {uploadError && (
         <p
           className="error"
@@ -1194,3 +1197,4 @@ const handleUpdateAlbumTitle = async (event, album) => {
     </section>
   );
 }
+

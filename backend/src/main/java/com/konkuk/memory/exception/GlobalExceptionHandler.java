@@ -16,6 +16,12 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> handleUploadSize() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiError.of(413,
+                "UPLOAD_TOO_LARGE", "사진 한 장 또는 전체 업로드 요청이 용량 제한을 초과했습니다. 파일 크기나 선택한 사진 수를 줄여 다시 시도해주세요."));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<ApiError> handleParameterType() {
         return ResponseEntity.badRequest().body(ApiError.of(400, "INVALID_PARAMETER", "요청 파라미터의 형식을 확인해주세요."));

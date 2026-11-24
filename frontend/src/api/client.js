@@ -1,3 +1,5 @@
+import { validateUploadSizes } from './uploadLimits';
+
 const configuredUrl =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:18080";
 
@@ -230,6 +232,8 @@ async function photoImage(albumId, photoId, signal) {
 }
 
 async function uploadPhotos(files) {
+  const sizeError = validateUploadSizes(Array.from(files));
+  if (sizeError) throw new Error(sizeError);
   const token = current?.accessToken;
 
   if (!token || current.expiresAt <= Date.now()) {
@@ -290,12 +294,9 @@ async function uploadPhotos(files) {
       expireSession();
     }
 
-    throw new ApiError(
-      response.status,
-      data || {
-        message: "사진 업로드에 실패했습니다.",
-      },
-    );
+    throw new ApiError(response.status, response.status === 413
+      ? { message: data?.message || "업로드 용량 제한을 초과했습니다. 사진 크기나 선택한 사진 수를 줄여 다시 시도해주세요." }
+      : data || { message: "사진 업로드에 실패했습니다." });
   }
 
   return data;

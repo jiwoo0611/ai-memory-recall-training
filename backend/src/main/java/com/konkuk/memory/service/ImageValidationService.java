@@ -14,7 +14,8 @@ import java.util.Set;
 @Service
 public class ImageValidationService {
 
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    @org.springframework.beans.factory.annotation.Value("${spring.servlet.multipart.max-file-size:30MB}")
+    private org.springframework.util.unit.DataSize maxFileSize = org.springframework.util.unit.DataSize.ofMegabytes(30);
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
             "image/jpeg",
@@ -42,11 +43,11 @@ public class ImageValidationService {
 
     private void validateSize(MultipartFile file) {
 
-        if (file.getSize() > MAX_FILE_SIZE) {
+        if (file.getSize() > maxFileSize.toBytes()) {
             throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
+                    HttpStatus.PAYLOAD_TOO_LARGE,
                     "FILE_TOO_LARGE",
-                    "사진은 최대 10MB까지 업로드할 수 있습니다."
+                    "사진 한 장은 최대 " + maxFileSize.toMegabytes() + "MB까지 업로드할 수 있습니다."
             );
         }
     }
