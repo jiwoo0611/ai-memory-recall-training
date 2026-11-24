@@ -48,6 +48,9 @@ test.beforeEach(async ({ page }) => {
       return route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==", "base64") });
     }
     const responses = {
+      "/api/users/me/delayed-recalls": [],
+      "/api/users/me/delayed-recalls/access": { canReview: false },
+      "/api/users/me/training-sessions/7/delayed-recall": null,
       "/api/users/me": { id: 1, name: "테스트", email: "test@example.com" },
       "/api/users/me/photos": { content: [photo] },
       "/api/users/me/training-sessions": { content: [], totalElements: 0, totalPages: 0 },
@@ -363,6 +366,7 @@ test("existing training and album quiz routes remain accessible", async ({ page 
   await expect(page.getByRole("heading", { name: "사진 속 기억을 들려주세요" })).toBeVisible();
   session.questions[0] = { ...session.questions[0], format: "MULTIPLE_CHOICE", options: ["서울", "부산", "제주", "인천"] };
   await page.goto("/#/albums/1/quiz/7");
+  await page.getByRole("button", { name: "평가 없이 훈련 시작", exact: true }).click();
   await expect(page.getByRole("heading", { name: "앨범 회상 퀴즈" })).toBeVisible();
   await expect(page.getByRole("radio")).toHaveCount(4);
 });
@@ -401,3 +405,4 @@ test("mypage retains saved growth, activity and training detail data", async ({ 
   await expect(page.getByLabel("훈련 상세")).toContainText("저장된 훈련 요약");
   await expect(page.getByRole("link", { name: "저장된 결과 보기" })).toHaveAttribute("href", "#/training/7");
 });
+
