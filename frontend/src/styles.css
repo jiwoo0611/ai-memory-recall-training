@@ -11,6 +11,7 @@
 .delayed-item h3, .delayed-item p { margin: 6px 0; }
 .delayed-item .button, .delayed-item button { flex-shrink: 0; }
 .delayed-enrollment { margin: 24px 0; padding: 20px 0; border-block: 1px solid #dce5df; }
+.delayed-enrollment > .button { margin-top: 16px; }
 .delayed-enrollment summary, .delayed-page summary { cursor: pointer; color: #285c50; padding: 12px 0; }
 .delayed-page { max-width: 840px; margin: 0 auto; }
 .delayed-page textarea, .delayed-enrollment textarea { display: block; width: 100%; box-sizing: border-box; margin: 12px 0; padding: 14px; border: 1px solid #a9beb2; border-radius: 10px; font: inherit; line-height: 1.8; resize: vertical; }
