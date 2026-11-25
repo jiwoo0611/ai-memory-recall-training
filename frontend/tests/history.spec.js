@@ -389,7 +389,7 @@ test("library album rename keeps the existing API and history", async ({ page })
 
 test("mypage retains saved growth, activity and training detail data", async ({ page }) => {
   const saved = {
-    id: 7, status: "COMPLETED", startedAt: "2026-01-01", completedAt: "2026-01-01",
+    id: 7, displayName: "여행 1", status: "COMPLETED", startedAt: "2026-01-01", completedAt: "2026-01-01",
     photo: { ...photo, albumId: 1 },
     result: { correctCount: 8, totalCount: 10, incorrectCount: 2, answeredCount: 10,
       cannotRecallCount: 0, mismatchCount: 0, feedbackStatus: "COMPLETED", summary: "저장된 훈련 요약" },
@@ -405,7 +405,7 @@ test("mypage retains saved growth, activity and training detail data", async ({ 
   await expect(page.getByText("80%", { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("최근 훈련별 정답률")).toBeVisible();
   await expect(page.locator(".activity")).toContainText("여행.jpg");
-  await page.getByRole("button", { name: "훈련 7 상세 보기" }).click();
+  await page.getByRole("button", { name: "여행 1 상세 보기" }).click();
   await expect(page.getByLabel("훈련 상세")).toContainText("저장된 훈련 요약");
   await expect(page.getByRole("link", { name: "저장된 결과 보기" })).toHaveAttribute("href", "#/training/7");
 });

@@ -9,7 +9,12 @@ import java.util.List;
 
 public record TrainingSessionDetailResponse(Long id, TrainingSessionSummaryResponse.PhotoInfo photo,
                                             TrainingSession.Status status, Instant startedAt, Instant completedAt,
-                                            List<QuestionInfo> questions, ResultInfo result) {
+                                            List<QuestionInfo> questions, ResultInfo result, String displayName) {
+    public TrainingSessionDetailResponse(Long id, TrainingSessionSummaryResponse.PhotoInfo photo,
+            TrainingSession.Status status, Instant startedAt, Instant completedAt,
+            List<QuestionInfo> questions, ResultInfo result) {
+        this(id,photo,status,startedAt,completedAt,questions,result,null);
+    }
     @com.fasterxml.jackson.annotation.JsonProperty("respondedCount")
     public int respondedCount() { return (int) questions.stream().filter(q -> q.answer() != null).count(); }
     @com.fasterxml.jackson.annotation.JsonProperty("questionCount")

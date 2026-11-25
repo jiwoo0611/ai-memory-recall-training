@@ -81,7 +81,7 @@ public class MyPageService {
         var resultResponse = results.findByTrainingSession_IdAndTrainingSession_Photo_User_Id(sessionId, currentUserId)
                 .map(TrainingSessionDetailResponse.ResultInfo::from).orElse(null);
         return new TrainingSessionDetailResponse(session.getId(), TrainingSessionSummaryResponse.PhotoInfo.from(session.getPhoto()),
-                session.getStatus(), session.getStartedAt(), session.getCompletedAt(), questionResponses, resultResponse);
+                session.getStatus(), session.getStartedAt(), session.getCompletedAt(), questionResponses, resultResponse, session.getDisplayName());
     }
 
     private PageRequest pageRequest(int page, int size, String sortField) {

@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { UPLOAD_HINT } from "../api/uploadLimits";
@@ -899,8 +900,7 @@ const handleUpdateAlbumTitle = async (event, album) => {
                   >
                     <div>
                       <p className="eyebrow">
-                        회상 퀴즈 #
-                        {session.id}
+                        {trainingName(session)}
                       </p>
 
                       <h3>
@@ -1139,5 +1139,3 @@ const handleUpdateAlbumTitle = async (event, album) => {
     </section>
   );
 }
-
-

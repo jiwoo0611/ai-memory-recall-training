@@ -103,7 +103,8 @@ class DelayedRecallIntegrationTest {
         assertThat(deterministic.start(userId,id).status()).isEqualTo("IN_PROGRESS");
         assertThat(deterministic.get(userId,id).facts()).isEmpty();
         String result=mvc.perform(get(path()).header("Authorization","Bearer "+token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(result).doesNotContain("부산","케이크","앨범 제목","사진.jpg");
+        assertThat(result).doesNotContain("부산","케이크","사진.jpg");
+        assertThat(json.readTree(result).path("displayName").asText()).isEqualTo("노출하면 안 되는 앨범 제목 1");
     }
     @Test void persistsDraftRejectsStaleWritesAndReplaysSubmission(){
         complete(now.minus(Duration.ofDays(7)));deterministic.start(userId,id);

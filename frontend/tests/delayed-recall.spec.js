@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const initial = { id: 7, sourceSessionId: 12, status: 'AVAILABLE', condition: 'QUIZ', protocolVersion: 'FREE_RECALL_7D_V1', completedAt: '2026-11-17T09:00:00Z', availableAt: '2026-11-24T09:00:00Z', responseText: null, cannotRecall: false, version: 0, factCount: 2, facts: [] };
+const initial = { id: 7, displayName: '부산 1', sourceSessionId: 12, status: 'AVAILABLE', condition: 'QUIZ', protocolVersion: 'FREE_RECALL_7D_V1', completedAt: '2026-11-17T09:00:00Z', availableAt: '2026-11-24T09:00:00Z', responseText: null, cannotRecall: false, version: 0, factCount: 2, facts: [] };
 async function fixture(page, change = {}) {
   let value = { ...initial, ...change };
   const unexpected=[];
@@ -27,7 +27,7 @@ async function fixture(page, change = {}) {
 
 test('list opens cue-free evaluation and restores server draft after reload',async({page})=>{
   const f=await fixture(page);
-  await page.goto('/#/mypage');await page.getByRole('link',{name:'회상 평가 시작'}).click();
+  await page.goto('/#/mypage');await expect(page.getByRole('heading',{name:'부산 1의 회상 평가'})).toBeVisible();await page.getByRole('link',{name:'회상 평가 시작'}).click();
   await expect(page.getByRole('heading',{name:'기억나는 만큼 편하게 적어 주세요'})).toBeVisible();
   await page.getByRole('button',{name:'평가 시작',exact:true}).click();
   expect(await page.locator('img').count()).toBe(0);
@@ -72,7 +72,7 @@ async function enrollmentFixture(page, failFirstSave = false) {
     {id:21,albumId:3,originalFilename:'beach.png',contentType:'image/png',sizeBytes:100},
     {id:22,albumId:3,originalFilename:'cake.png',contentType:'image/png',sizeBytes:100},
   ];
-  const session={id:12,photo:photos[0],status:'IN_PROGRESS',questions:[{id:101,format:'MULTIPLE_CHOICE',questionOrder:1,content:'어디에서 산책했나요?',options:['해변','공원','산','집'],displayPhotoIds:[]}],result:null};
+  const session={id:12,displayName:'부산 1',photo:photos[0],status:'IN_PROGRESS',questions:[{id:101,format:'MULTIPLE_CHOICE',questionOrder:1,content:'어디에서 산책했나요?',options:['해변','공원','산','집'],displayPhotoIds:[]}],result:null};
   let saved=null;
   const submissions=[],unexpected=[];
   await page.route('**/api/**',async route=>{

@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { date, ErrorBox } from './UI';
@@ -8,7 +9,7 @@ export function RecallLink({ item }) {
   const waiting = ['WAITING_TRAINING', 'NOT_DUE'].includes(item.status);
   const days = item.availableAt ? Math.max(0, Math.ceil((new Date(item.availableAt) - Date.now()) / 86400000)) : null;
   return <article className="delayed-item">
-    <div><span className="eyebrow">{recallLabels[item.status]}</span><h3>훈련 #{item.sourceSessionId}의 회상 평가</h3>
+    <div><span className="eyebrow">{recallLabels[item.status]}</span><h3>{trainingName(item)}의 회상 평가</h3>
       <p className="muted">{item.availableAt ? `평가 가능 ${date(item.availableAt)}` : '훈련을 완료하면 7일 후 평가할 수 있어요.'}</p>
       {item.status === 'GRADED' && <p>7일 지연 회상률 <strong>{item.recallRate}%</strong></p>}
     </div>

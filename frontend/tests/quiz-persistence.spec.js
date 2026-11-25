@@ -22,7 +22,8 @@ async function prepare(page, request) {
   await login(page); await page.goto(`/#/training/${sessionId}`);
   await page.getByRole("button", { name: "평가 없이 훈련 시작", exact: true }).click();
   await expect(page.getByRole("heading", { name: "앨범 회상 퀴즈", exact: true })).toBeVisible();
-  return { sessionId, headers };
+  const saved = await (await request.get(`${backend}/api/users/me/training-sessions/${sessionId}`, {headers})).json();
+  return { sessionId, headers, displayName: saved.displayName };
 }
 async function choose(page) {
   await page.getByRole("radio", { name: "1 보기 A" }).click();
@@ -33,7 +34,7 @@ async function choose(page) {
 }
 
 test("real DB result survives reload and login; retraining preserves old session", async ({ page, request }) => {
-  const { sessionId, headers } = await prepare(page, request);
+  const { sessionId, headers, displayName } = await prepare(page, request);
   await choose(page); await page.getByRole("button", { name: "제출하고 결과 보기" }).click();
   await expect(page.getByRole("heading", { name: "회상 퀴즈 결과" })).toBeVisible();
   await expect(page.locator(".quiz-score-summary strong")).toHaveText("2 / 3");
@@ -49,7 +50,7 @@ test("real DB result survives reload and login; retraining preserves old session
   await page.reload(); await expect(page.locator(".quiz-score-summary strong")).toHaveText("2 / 3");
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await login(page);
-  await page.getByRole("button", { name: `훈련 ${sessionId} 상세 보기`, exact: true }).click();
+  await page.getByRole("button", { name: `${displayName} 상세 보기`, exact: true }).click();
   await expect(page.getByLabel("훈련 상세")).toContainText("정답 2 / 3");
   await page.getByRole("link", { name: "저장된 결과 보기", exact: true }).click();
   await expect(page.locator(".quiz-score-summary strong")).toHaveText("2 / 3");

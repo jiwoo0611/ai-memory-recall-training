@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import DelayedRecallSection from "../components/DelayedRecallSection";
@@ -87,7 +88,7 @@ function GrowthStats({ state }) {
       <div className="growth-metrics"><strong>{correct * 10} XP</strong><span>다음 레벨까지 {10 - (correct % 10)}문항</span></div>
       <div className="growth-progress" role="progressbar" aria-label="다음 레벨 진행률" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100"><span style={{width: `${progress}%`}} /></div>
       <div className="growth-stat-grid"><div><strong>{rate}%</strong><span>평균 정답률</span></div><div><strong>{rows.length}</strong><span>완료한 훈련</span></div><div><strong>{best}%</strong><span>최고 기록</span></div><div><strong>{streak}일</strong><span>최근 연속 기록</span></div></div>
-      {rows.length ? <><div className="growth-chart-heading"><strong>최근 7회 정답률</strong><span className="muted">높을수록 좋아요</span></div><div className="growth-chart" aria-label="최근 훈련별 정답률">{rows.slice(-7).map(item => { const score = Math.round(item.result.correctCount / item.result.totalCount * 100); return <div className="growth-bar" key={item.id}><span title={`${score}%`} style={{height: `${Math.max(8, score)}%`}} /><small>{new Date(item.startedAt).toLocaleDateString("ko-KR", {month:"numeric", day:"numeric"})}</small></div>; })}</div></> : <Empty>결과가 저장되면 성장 기록이 시작됩니다.</Empty>}
+      {rows.length ? <><div className="growth-chart-heading"><strong>최근 7회 정답률</strong><span className="muted">높을수록 좋아요</span></div><div className="growth-chart" aria-label="최근 훈련별 정답률">{rows.slice(-7).map(item => { const score = Math.round(item.result.correctCount / item.result.totalCount * 100); return <div className="growth-bar" key={item.id}><span title={`${trainingName(item)} · ${score}%`} style={{height: `${Math.max(8, score)}%`}} /><small>{new Date(item.startedAt).toLocaleDateString("ko-KR", {month:"numeric", day:"numeric"})}</small></div>; })}</div></> : <Empty>결과가 저장되면 성장 기록이 시작됩니다.</Empty>}
     </section>;
   }}</LoadState>;
 }
@@ -114,9 +115,7 @@ function SessionDetail({ id, onClose }) {
       <div className="section-heading">
         <h2>
           훈련 상세{" "}
-          <span className="muted">
-            #{id}
-          </span>
+          
         </h2>
 
         <button
@@ -132,7 +131,7 @@ function SessionDetail({ id, onClose }) {
           <>
             <div className="detail-heading">
               <h3>
-                {data.photo.originalFilename}
+                {trainingName(data)}
               </h3>
 
               <Badge value={data.status} />
@@ -290,9 +289,7 @@ export default function MyPage() {
         ...t.content.map((x) => ({
           key: `t${x.id}`,
           type: "훈련 시작",
-          title:
-            x.photo
-              .originalFilename,
+          title: trainingName(x),
           time: x.startedAt,
         })),
       ]
@@ -420,24 +417,7 @@ export default function MyPage() {
                                 }
                               />
 
-                              <h3>
-                                {
-                                  s
-                                    .photo
-                                    .originalFilename
-                                }
-                              </h3>
-
-                              <p className="muted">
-                                훈련 #
-                                {s.id} ·
-                                사진 #
-                                {
-                                  s
-                                    .photo
-                                    .id
-                                }
-                              </p>
+                              <h3>{trainingName(s)}</h3>
 
                               <p className="muted">
                                 시작{" "}
@@ -456,7 +436,7 @@ export default function MyPage() {
 
                             <button
                               type="button"
-                              aria-label={`훈련 ${s.id} 상세 보기`}
+                              aria-label={`${trainingName(s)} 상세 보기`}
                               aria-expanded={
                                 selected ===
                                 s.id
@@ -564,4 +544,3 @@ export default function MyPage() {
     </>
   );
 }
-

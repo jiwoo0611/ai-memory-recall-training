@@ -1,5 +1,12 @@
 import { test, expect } from "@playwright/test";
 const backend = "http://127.0.0.1:18080";
+async function trainingLabel(page, id) {
+  const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem("memory-recall-session")).accessToken);
+  const response = await page.request.get(`${backend}/api/users/me/training-sessions/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()).displayName;
+}
+
 async function login(
   page,
   email = "demo@example.com",
@@ -52,7 +59,7 @@ test("실제 사진·훈련 페이지네이션, 질문·답변·결과 및 미�
   await login(page);
   await expect(page.getByText("시연 사용자님, 반갑습니다.")).toBeVisible();
   await page
-    .getByRole("button", { name: "훈련 8 상세 보기", exact: true })
+    .getByRole("button", { name: `${await trainingLabel(page, 8)} 상세 보기`, exact: true })
     .click();
   await expect(page.getByText("누구와 함께한 산책인가요?")).toBeVisible();
   await expect(page.getByText("가족과 함께 공원을 걸었습니다.")).toBeVisible();
@@ -64,7 +71,7 @@ test("실제 사진·훈련 페이지네이션, 질문·답변·결과 및 미�
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "훈련 7 상세 보기", exact: true })
+    .getByRole("button", { name: `${await trainingLabel(page, 7)} 상세 보기`, exact: true })
     .click();
   await expect(page.getByText("아직 질문과 답변이 없습니다.")).toBeVisible();
   await expect(page.getByText("아직 훈련 결과가 없습니다.")).toBeVisible();
@@ -78,7 +85,7 @@ test("실제 사진·훈련 페이지네이션, 질문·답변·결과 및 미�
     .filter({ has: page.getByRole("heading", { name: "회상 훈련 기록" }) });
   await sessions.getByRole("button", { name: "다음", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "훈련 1 상세 보기", exact: true }),
+    page.getByRole("button", { name: `${await trainingLabel(page, 1)} 상세 보기`, exact: true }),
   ).toBeVisible();
 });
 test("이메일 중복과 로그인 실패 안내", async ({ page }) => {
@@ -173,7 +180,7 @@ test("모바일 화면·홈 및 상세 404 표시", async ({ page }) => {
     }),
   );
   await page
-    .getByRole("button", { name: "훈련 8 상세 보기", exact: true })
+    .getByRole("button", { name: `${await trainingLabel(page, 8)} 상세 보기`, exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText(
     "훈련 기록을 찾을 수 없습니다.",

@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import PhotoImage from "../components/PhotoImage";
@@ -175,7 +176,7 @@ export default function QuizPage({ albumId, sessionId }) {
       <section className="card quiz-page quiz-result-page">
         <p className="eyebrow">ALBUM RECALL RESULT</p>
         <h1>회상 퀴즈 결과</h1>
-        <p>{session.photo.originalFilename} · <Badge value={session.status} /></p>
+        <p>{trainingName(session)} · <Badge value={session.status} /></p>
         <p className="muted">시작 {date(session.startedAt)} · 완료 {date(session.completedAt)}</p>
         <div className="quiz-result-hero">
           <div className="quiz-result-stars" aria-label={`${Math.max(1, Math.round(scoreResult.correctCount / scoreResult.totalCount * 3))}개 별 달성`}>
@@ -265,7 +266,7 @@ export default function QuizPage({ albumId, sessionId }) {
           <h2>같은 사진의 훈련 기록</h2>
           <ErrorBox error={historyError} retry={() => setHistoryRevision(v => v + 1)} />
           {history ? <>{history.content.length ? history.content.map(item => <a className="recall-history-item" key={item.id} href={`#/training/${item.id}`}>
-            <span>{date(item.startedAt)}</span><Badge value={item.status} />
+            <span>{trainingName(item)}</span><span>{date(item.startedAt)}</span><Badge value={item.status} />
             {item.result?.correctCount != null && <span>정답 {item.result.correctCount} / {item.result.totalCount}</span>}
           </a>) : <p>이 사진의 기록이 없습니다.</p>}<Pager data={history} onPage={setHistoryPage} /></> : !historyError && <p role="status">이력을 불러오는 중…</p>}
         </section>
@@ -276,7 +277,7 @@ export default function QuizPage({ albumId, sessionId }) {
   if (session.status !== "IN_PROGRESS") return <section className="card"><Badge value={session.status} /><p>현재 상태에서는 퀴즈를 제출할 수 없습니다.</p><a href="#/mypage">훈련 이력 보기</a></section>;
 
   if (!recallReady) return <section className="card quiz-page">
-    <a className="back-link" href="#/mypage">← 마이페이지</a><h1>훈련 시작 전 안내</h1>
+    <a className="back-link" href="#/mypage">← 마이페이지</a><h1>훈련 시작 전 안내</h1><p className="muted">{trainingName(session)}</p>
     <p>원한다면 이번 훈련을 마친 7일 후, 사진 없이 기억을 떠올리는 평가에 참여할 수 있어요. 참여하지 않아도 퀴즈를 진행할 수 있어요.</p>
     <RecallEnrollment albumId={session.photo.albumId} photos={photos} sessionId={sessionId} completed={false} canEnroll onContinue={() => setRecallReady(true)} />
   </section>;
@@ -337,7 +338,7 @@ export default function QuizPage({ albumId, sessionId }) {
             ← 퀴즈 나가기
           </a>
           <p className="eyebrow">{album?.title || "앨범"} RECALL QUIZ</p>
-          <h1>앨범 회상 퀴즈</h1>
+          <h1>앨범 회상 퀴즈</h1><p className="muted">{trainingName(session)}</p>
         </div>
         <strong aria-live="polite">{currentIndex + 1} / {questions.length}</strong>
       </div>

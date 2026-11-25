@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { date, ErrorBox } from '../components/UI';
@@ -17,7 +18,7 @@ export default function DelayedRecallPage({ id }) {
   return <section className="card delayed-page">
     <a className="back-link" href="#/mypage" onClick={e=>{if(dirty){e.preventDefault();setNotice('이동 전 임시 저장을 눌러 작성 내용을 보관해 주세요.');}}}>← 마이페이지</a>
     <p className="eyebrow">{recallLabels[data.status]}</p><h1>7일 후 회상 평가</h1>
-    <p className="muted">훈련 #{data.sourceSessionId} · 훈련 완료 {date(data.completedAt)}</p>
+    <p className="muted">{trainingName(data)} · 훈련 완료 {date(data.completedAt)}</p>
     {['WAITING_TRAINING','NOT_DUE'].includes(data.status)&&<><p>훈련 완료부터 7일이 지나면 참여할 수 있어요.</p><p>평가 가능 {date(data.availableAt)}</p><button onClick={()=>setRevision(v=>v+1)}>상태 새로고침</button></>}
     {data.status==='AVAILABLE'&&<><h2>기억나는 만큼 편하게 적어 주세요</h2><p>표시된 훈련에서 다룬 경험을 사진과 선택지 없이 떠올려 주세요. 기억이 나지 않는 부분은 적지 않아도 괜찮아요.</p><p>평가 중에는 사진이나 이전 훈련 기록을 확인하지 말아 주세요. 작성 중 잠시 쉬려면 임시 저장을 눌러 주세요.</p><button className="button" disabled={busy} onClick={()=>act('start')}>평가 시작</button></>}
     {writing&&<form onSubmit={e=>{e.preventDefault();setConfirm(true);}}>

@@ -28,10 +28,10 @@ public class DelayedRecallService {
                        Instant confirmedAt, Instant completedAt, Instant availableAt, Instant startedAt,
                        Instant submittedAt, Long elapsedSeconds, String responseText, boolean cannotRecall,
                        long version, int factCount, Integer recalledCount, Double recallRate,
-                       Instant gradedAt, List<Fact> facts) {}
+                       Instant gradedAt, List<Fact> facts, String displayName) {}
     private record Row(long id, long sessionId, long ownerId, String condition, String protocol,
                        Instant confirmed, Instant completed, Instant started, Instant submitted,
-                       String text, boolean cannotRecall, long version, Instant graded) {}
+                       String text, boolean cannotRecall, long version, Instant graded, String displayName) {}
     private final JdbcTemplate db;
     private final TrainingSessionRepository sessions;
     private final PhotoRepository photos;
@@ -49,12 +49,12 @@ public class DelayedRecallService {
         Timestamp t=r.getTimestamp(name); return t==null?null:t.toInstant();
     }
     private List<Row> rows(String where, Object... args) {
-        return db.query("SELECT d.*, s.completed_at, p.user_id FROM delayed_recalls d "
-            +"JOIN training_sessions s ON s.id=d.source_session_id JOIN photos p ON p.id=s.photo_id "+where,
+        return db.query("SELECT d.*, s.completed_at, p.user_id, s.album_sequence, a.title AS album_title FROM delayed_recalls d "
+            +"JOIN training_sessions s ON s.id=d.source_session_id JOIN photos p ON p.id=s.photo_id JOIN albums a ON a.id=p.album_id "+where,
             (r,n)->new Row(r.getLong("id"),r.getLong("source_session_id"),r.getLong("user_id"),
                 r.getString("condition_name"),r.getString("protocol_version"),instant(r,"confirmed_at"),
                 instant(r,"completed_at"),instant(r,"started_at"),instant(r,"submitted_at"),
-                r.getString("response_text"),r.getBoolean("cannot_recall"),r.getLong("draft_version"),instant(r,"graded_at")),args);
+                r.getString("response_text"),r.getBoolean("cannot_recall"),r.getLong("draft_version"),instant(r,"graded_at"),r.getString("album_title")+" "+r.getLong("album_sequence")),args);
     }
     private Row owned(long userId,long id,boolean lock) {
         var found=rows("WHERE d.id=? AND p.user_id=?"+(lock?" FOR UPDATE":""),id,userId);
@@ -84,7 +84,7 @@ public class DelayedRecallService {
         List<Fact> visible=detail&&r.graded!=null?all:List.of();
         return new View(r.id,r.sessionId,status(r),r.condition,r.protocol,r.confirmed,r.completed,due(r),r.started,r.submitted,
             r.completed==null||r.submitted==null?null:Duration.between(r.completed,r.submitted).getSeconds(),
-            detail?r.text:null,r.cannotRecall,r.version,all.size(),count,rate,r.graded,visible);
+            detail?r.text:null,r.cannotRecall,r.version,all.size(),count,rate,r.graded,visible,r.displayName);
     }
     @Transactional(readOnly=true)
     public List<View> list(long userId) {

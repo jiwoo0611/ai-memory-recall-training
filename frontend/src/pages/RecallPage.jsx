@@ -1,3 +1,4 @@
+import { trainingName } from "../api/trainingName";
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { Badge, date, Empty, ErrorBox, Pager } from "../components/UI";
@@ -94,7 +95,7 @@ export default function RecallPage({ sessionId, albumId }) {
   return <div className="recall-layout">
     <section className="card recall-main">
       <a href="#/mypage" className="back-link">← 내 훈련 이력</a>
-      <p className="eyebrow">나의 회상 기록</p>
+      <p className="eyebrow">{trainingName(data)}</p>
       <h1>{completed ? "훈련 결과" : "사진 속 기억을 들려주세요"}</h1>
       <p className="muted">시작 {date(data.startedAt)}{completed && ` · 완료 ${date(data.completedAt)}`}</p>
       <Badge value={data.status} />
@@ -156,7 +157,7 @@ export default function RecallPage({ sessionId, albumId }) {
     <aside className="card recall-history"><h2>같은 사진의 훈련</h2>
       <ErrorBox error={historyError} retry={() => setHistoryRevision((v) => v + 1)} />
       {history ? <>{history.content.length ? history.content.map((item) => <a className="recall-history-item" key={item.id} href={`#/training/${item.id}`} aria-current={String(item.id) === String(sessionId) ? "page" : undefined}>
-        <span>{date(item.startedAt)}</span><Badge value={item.status} /><small>훈련 #{item.id}</small>
+        <span>{date(item.startedAt)}</span><Badge value={item.status} /><small>{trainingName(item)}</small>
       </a>) : <Empty>이 사진의 기록이 없습니다.</Empty>}<Pager data={history} onPage={setHistoryPage} /></> : !historyError && <p role="status">이력을 불러오는 중…</p>}
     </aside>
   </div>;
