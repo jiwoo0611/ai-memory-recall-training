@@ -1,6 +1,7 @@
 <div align="center">
+# AI-Based Memory Recall Training System
 
-# 기억산책
+## 기억산책
 
 ### 사진 속 순간을, 나의 이야기로
 
