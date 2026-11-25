@@ -305,16 +305,12 @@ async function uploadPhotos(albumId, files) {
 
 export const api = {
   delayedRecalls: (signal, albumId) => request(`/api/users/me/delayed-recalls${albumId ? `?albumId=${encodeURIComponent(albumId)}` : ''}`, { signal }),
-  delayedAccess: (signal) => request('/api/users/me/delayed-recalls/access', { signal }),
   delayedForSession: (id, signal) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/delayed-recall`, { signal }),
   enrollDelayed: (id, body) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/delayed-recall`, { method: 'POST', body }),
   delayedDetail: (id, signal) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}`, { signal }),
   startDelayed: (id) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/start`, { method: 'POST' }),
   saveDelayed: (id, body) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/draft`, { method: 'PATCH', body }),
   submitDelayed: (id, body) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/submit`, { method: 'POST', body }),
-  delayedQueue: (signal) => request('/api/review/delayed-recalls', { signal }),
-  delayedReview: (id, signal) => request(`/api/review/delayed-recalls/${encodeURIComponent(id)}`, { signal }),
-  gradeDelayed: (id, body) => request(`/api/review/delayed-recalls/${encodeURIComponent(id)}/grade`, { method: 'POST', body }),
   submitRecall: (id, answers) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/answers`, { method: "POST", body: { answers } }),
   feedback: (id) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/feedback`, { method: "POST" }),
   retrain: (id, requestId) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/retrain`, { method: "POST", body: { requestId } }),
@@ -470,5 +466,3 @@ export const api = {
       },
     ),
 };
-
-

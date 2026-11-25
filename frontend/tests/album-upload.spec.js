@@ -15,7 +15,6 @@ test('create an album first, upload into it and keep same-region trips separate'
     }
     if(path==='/api/albums')return route.fulfill({json:albums});
     if(path==='/api/users/me/training-sessions')return route.fulfill({json:{content:[]}});
-    if(path==='/api/users/me/delayed-recalls/access')return route.fulfill({json:{canReview:false}});
     if(path==='/api/users/me/delayed-recalls'){filters.push(url.searchParams.get('albumId'));return route.fulfill({json:[]});}
     if(path.endsWith('/image'))return route.fulfill({contentType:'image/png',body:image});
     const match=path.match(/^\/api\/albums\/(\d+)(\/photos)?$/);

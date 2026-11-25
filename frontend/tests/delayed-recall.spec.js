@@ -11,7 +11,6 @@ async function fixture(page, change = {}) {
     expect(request.headers().authorization).toBe(`Bearer ${token}`);
     if(path==='/api/users/me')return route.fulfill({json:{id:1,name:'테스트',email:'fixture@example.com'}});
     if(path==='/api/users/me/photos'||path==='/api/users/me/training-sessions')return route.fulfill({json:{content:[],totalElements:0,totalPages:0}});
-    if(path==='/api/users/me/delayed-recalls/access')return route.fulfill({json:{canReview:false}});
     if(path==='/api/users/me/delayed-recalls')return route.fulfill({json:[value]});
     if(path==='/api/users/me/delayed-recalls/7')return route.fulfill({json:value});
     if(path.endsWith('/7/start')) {value={...value,status:'IN_PROGRESS',startedAt:new Date().toISOString()};return route.fulfill({json:value});}
@@ -63,4 +62,78 @@ test('mobile result remains readable',async({page})=>{
   await page.goto('/#/delayed-recall/7');await expect(page.getByText('50%',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
   await page.screenshot({path:'test-results/delayed-mobile.png',fullPage:true});
+});
+
+
+async function enrollmentFixture(page, failFirstSave = false) {
+  const token = `test.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000)+3600 })).toString('base64url')}.test`;
+  await page.addInitScript(({token})=>sessionStorage.setItem('memory-recall-session',JSON.stringify({accessToken:token,expiresAt:Date.now()+3600000})),{token});
+  const photos = [
+    {id:21,albumId:3,originalFilename:'beach.png',contentType:'image/png',sizeBytes:100},
+    {id:22,albumId:3,originalFilename:'cake.png',contentType:'image/png',sizeBytes:100},
+  ];
+  const session={id:12,photo:photos[0],status:'IN_PROGRESS',questions:[{id:101,format:'MULTIPLE_CHOICE',questionOrder:1,content:'어디에서 산책했나요?',options:['해변','공원','산','집'],displayPhotoIds:[]}],result:null};
+  let saved=null;
+  const submissions=[],unexpected=[];
+  await page.route('**/api/**',async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname;
+    if(path==='/api/users/me')return route.fulfill({json:{id:1,name:'테스트'}});
+    if(path==='/api/users/me/training-sessions/12')return route.fulfill({json:session});
+    if(path==='/api/users/me/photos/21/training-sessions')return route.fulfill({json:{content:[],totalPages:0}});
+    if(path==='/api/albums/3')return route.fulfill({json:{id:3,title:'부산 여행'}});
+    if(path==='/api/albums/3/photos')return route.fulfill({json:photos});
+    if(path.endsWith('/image'))return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==','base64')});
+    if(path==='/api/users/me/training-sessions/12/delayed-recall'){
+      if(req.method()==='POST'){
+        submissions.push(req.postDataJSON());
+        if(failFirstSave && submissions.length===1)return route.fulfill({status:503,json:{message:'일시적인 저장 오류'}});
+        saved={...initial,status:'WAITING_TRAINING',completedAt:null,availableAt:null};
+      }
+      return route.fulfill({json:saved});
+    }
+    unexpected.push(path);return route.fulfill({status:404,json:{message:'예상하지 않은 요청'}});
+  });
+  return {submissions,unexpected};
+}
+test('ordinary quiz skips all photo information inputs and creates no evaluation',async({page})=>{
+  const f=await enrollmentFixture(page);
+  await page.goto('/#/albums/3/quiz/12');
+  await expect(page.getByRole('button',{name:'7일 지연회상 평가 선택',exact:true})).toBeVisible();
+  await expect(page.getByLabel('사진 1 정보')).toHaveCount(0);
+  await expect(page.locator('main img')).toHaveCount(0);
+  await page.getByRole('button',{name:'평가 없이 훈련 시작',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'앨범 회상 퀴즈'})).toBeVisible();
+  expect(f.submissions).toEqual([]);expect(f.unexpected).toEqual([]);
+});
+test('delayed evaluation shows each uploaded photo above its input and persists photo IDs',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const f=await enrollmentFixture(page,true);
+  await page.goto('/#/albums/3/quiz/12');
+  await page.getByRole('button',{name:'7일 지연회상 평가 선택',exact:true}).click();
+  await expect(page.getByRole('img',{name:'beach.png',exact:true})).toBeVisible();
+  await expect(page.getByRole('img',{name:'cake.png',exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox')).toHaveCount(2);
+  await expect(page.locator('textarea')).toHaveCount(0);
+  const first=page.locator('.delayed-photo-fact').first();
+  expect(await first.evaluate(el=>(el.querySelector('img').compareDocumentPosition(el.querySelector('input')) & Node.DOCUMENT_POSITION_FOLLOWING)!==0)).toBeTruthy();
+  await page.getByLabel('사진 1 정보').fill('부산 해변에서 산책했다.');
+  await page.getByLabel('사진 2 정보').fill('친구와 케이크를 먹었다.');
+  await page.getByLabel('사진 소유자로서 위 정보가 실제 경험과 일치함을 확인했어요.').check();
+  await page.getByRole('button',{name:'사진 정보 저장하고 평가 예약',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('일시적인 저장 오류');
+  await expect(page.getByLabel('사진 1 정보')).toHaveValue('부산 해변에서 산책했다.');
+  await page.getByRole('button',{name:'사진 정보 저장하고 평가 예약',exact:true}).click();
+  await expect(page.getByRole('button',{name:'훈련 시작',exact:true})).toBeVisible();
+  expect(f.submissions[1]).toEqual({facts:[{photoId:21,content:'부산 해변에서 산책했다.'},{photoId:22,content:'친구와 케이크를 먹었다.'}],confirmed:true});
+  await page.reload();
+  await expect(page.getByRole('button',{name:'훈련 시작',exact:true})).toBeVisible();
+  await expect(page.getByLabel('사진 1 정보')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+  expect(f.unexpected).toEqual([]);
+});
+test('retired manual grading page is not available',async({page})=>{
+  await fixture(page);
+  await page.goto('/#/recall-review');
+  await expect(page.getByRole('heading',{name:'페이지를 찾을 수 없습니다.'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'제출된 회상 평가 채점하기'})).toHaveCount(0);
 });

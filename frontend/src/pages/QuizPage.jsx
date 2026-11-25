@@ -57,8 +57,8 @@ export default function QuizPage({ albumId, sessionId }) {
           throw new Error("이 앨범의 퀴즈가 아닙니다.");
         }
         // A stored result remains readable even if an album/photo request fails.
-        const [albumResponse, photoResponse] = sessionResponse.status === "COMPLETED" || !albumId
-          ? [null, []] : await Promise.all([api.album(albumId, controller.signal), api.albumPhotos(albumId, controller.signal)]);
+        const [albumResponse, photoResponse] = sessionResponse.status === "COMPLETED" || !sessionResponse.photo?.albumId
+          ? [null, []] : await Promise.all([api.album(sessionResponse.photo.albumId, controller.signal), api.albumPhotos(sessionResponse.photo.albumId, controller.signal)]);
 
         if (!controller.signal.aborted) {
           setAlbum(albumResponse);
@@ -246,7 +246,7 @@ export default function QuizPage({ albumId, sessionId }) {
         </section>
         <ErrorBox error={submissionError} />
 
-        <RecallEnrollment sessionId={sessionId} completed canEnroll={false} />
+        <RecallEnrollment albumId={session.photo.albumId} photos={photos} sessionId={sessionId} completed canEnroll={false} />
         <div className="quiz-complete-actions">
           <button
             className="button"
@@ -278,7 +278,7 @@ export default function QuizPage({ albumId, sessionId }) {
   if (!recallReady) return <section className="card quiz-page">
     <a className="back-link" href="#/mypage">← 마이페이지</a><h1>훈련 시작 전 안내</h1>
     <p>원한다면 이번 훈련을 마친 7일 후, 사진 없이 기억을 떠올리는 평가에 참여할 수 있어요. 참여하지 않아도 퀴즈를 진행할 수 있어요.</p>
-    <RecallEnrollment sessionId={sessionId} completed={false} canEnroll onContinue={() => setRecallReady(true)} />
+    <RecallEnrollment albumId={session.photo.albumId} photos={photos} sessionId={sessionId} completed={false} canEnroll onContinue={() => setRecallReady(true)} />
   </section>;
 
   const question = questions[currentIndex];

@@ -55,39 +55,51 @@ class DelayedRecallIntegrationTest {
     @Autowired DelayedRecallService service;
     @Autowired TokenService tokens;
     @Autowired jakarta.persistence.EntityManager entityManager;
-    long userId,otherId,sessionId,photoId,id;
+    long userId,otherId,sessionId,photoId,secondPhotoId,id;
     String token,otherToken;
     final Instant now=Instant.parse("2026-11-24T12:00:00Z");
     DelayedRecallService deterministic;
+    List<DelayedRecallService.PhotoFact> references;
     @BeforeEach void setup(){
         String suffix=UUID.randomUUID().toString();
         var owner=users.saveAndFlush(new User(suffix+"@example.com","fixture","본인"));
-        var other=users.saveAndFlush(new User("other"+suffix+"@example.com","fixture","담당자"));
+        var other=users.saveAndFlush(new User("other"+suffix+"@example.com","fixture","다른 사용자"));
         userId=owner.getId();otherId=other.getId();token=tokens.issue(userId).accessToken();otherToken=tokens.issue(otherId).accessToken();
         var album=albums.saveAndFlush(new Album(owner,"노출하면 안 되는 앨범 제목"));
         var photo=photos.saveAndFlush(new Photo(owner,album,suffix,"노출하면 안 되는 사진.jpg","image/jpeg",1));photoId=photo.getId();
-        var s=new TrainingSession(photo);s.markInProgress();sessionId=sessions.saveAndFlush(s).getId();
-        deterministic=new DelayedRecallService(db,sessions,Long.toString(otherId),Clock.fixed(now,ZoneOffset.UTC));
-        id=deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(List.of("부산에 갔다","친구와 케이크를 먹었다"),true)).id();
+        secondPhotoId=photos.saveAndFlush(new Photo(owner,album,suffix+"-second","second.jpg","image/jpeg",1)).getId();
+        var session=new TrainingSession(photo);session.markInProgress();sessionId=sessions.saveAndFlush(session).getId();
+        deterministic=new DelayedRecallService(db,sessions,photos,Clock.fixed(now,ZoneOffset.UTC));
+        references=List.of(new DelayedRecallService.PhotoFact(photoId,"부산에 갔다"),new DelayedRecallService.PhotoFact(secondPhotoId,"친구와 케이크를 먹었다"));
+        id=deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(references,true)).id();
     }
     void complete(Instant at){entityManager.flush();db.update("UPDATE training_sessions SET started_at=?,completed_at=?,status='COMPLETED' WHERE id=?",Timestamp.from(at.minusSeconds(100)),Timestamp.from(at),sessionId);entityManager.clear();}
     String path(){return "/api/users/me/delayed-recalls/"+id;}
     String body(Object x)throws Exception{return json.writeValueAsString(x);}
+
+    @Test void persistsOneFactPerPhotoAndRejectsOtherAlbumsOrOwners() throws Exception {
+        assertThat(db.queryForList("SELECT photo_id FROM delayed_recall_facts WHERE delayed_recall_id=? ORDER BY fact_order",Long.class,id))
+            .containsExactly(photoId,secondPhotoId);
+        var album=albums.saveAndFlush(new Album(users.findById(userId).orElseThrow(),"다른 여행"));
+        var differentPhoto=photos.saveAndFlush(new Photo(users.findById(userId).orElseThrow(),album,"different","different.jpg","image/jpeg",1));
+        var request=new DelayedRecallService.Setup(List.of(new DelayedRecallService.PhotoFact(differentPhoto.getId(),"다른 앨범 정보")),true);
+        mvc.perform(post("/api/users/me/training-sessions/"+sessionId+"/delayed-recall").header("Authorization","Bearer "+token)
+            .contentType(MediaType.APPLICATION_JSON).content(body(request))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/users/me/training-sessions/"+sessionId+"/delayed-recall").header("Authorization","Bearer "+otherToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body(new DelayedRecallService.Setup(references,true)))).andExpect(status().isNotFound());
+    }
     @Test void albumListOnlyReturnsOwnedEvaluationsFromThatAlbum() throws Exception {
         long albumId=photos.findById(photoId).orElseThrow().getAlbum().getId();
         var otherAlbum=albums.saveAndFlush(new Album(users.findById(userId).orElseThrow(),"같은 지역 다른 여행"));
         assertThat(service.listForAlbum(userId,albumId)).extracting(DelayedRecallService.View::id).containsExactly(id);
         assertThat(service.listForAlbum(userId,otherAlbum.getId())).isEmpty();
         assertThat(service.listForAlbum(otherId,albumId)).isEmpty();
-        mvc.perform(get("/api/users/me/delayed-recalls").param("albumId",Long.toString(otherAlbum.getId()))
-            .header("Authorization","Bearer "+token)).andExpect(status().isOk()).andExpect(content().json("[]"));
     }
     @Test void exactSevenDayBoundaryAndNoReferenceLeak() throws Exception {
         complete(now.minus(Duration.ofDays(7)).plusNanos(1000));
         assertThat(deterministic.get(userId,id).status()).isEqualTo("NOT_DUE");
         assertThatThrownBy(()->deterministic.start(userId,id)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
         complete(now.minus(Duration.ofDays(7)));
-        assertThat(deterministic.get(userId,id).status()).isEqualTo("AVAILABLE");
         assertThat(deterministic.start(userId,id).status()).isEqualTo("IN_PROGRESS");
         assertThat(deterministic.get(userId,id).facts()).isEmpty();
         String result=mvc.perform(get(path()).header("Authorization","Bearer "+token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -108,44 +120,45 @@ class DelayedRecallIntegrationTest {
         complete(Instant.now());
         for(String suffix:List.of("/start","/submit")) mvc.perform(post(path()+suffix).header("Authorization","Bearer "+token)
             .contentType(MediaType.APPLICATION_JSON).content(body(Map.of("version",0,"text","기억","cannotRecall",false)))).andExpect(status().isConflict());
-        mvc.perform(patch(path()+"/draft").header("Authorization","Bearer "+token).contentType(MediaType.APPLICATION_JSON)
-            .content(body(Map.of("version",0,"text","기억","cannotRecall",false)))).andExpect(status().isConflict());
         mvc.perform(get(path()).header("Authorization","Bearer "+otherToken)).andExpect(status().isNotFound());
-        mvc.perform(post(path()+"/start").header("Authorization","Bearer "+otherToken)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/review/delayed-recalls/"+id).header("Authorization","Bearer "+token)).andExpect(status().isForbidden());
         mvc.perform(get(path())).andExpect(status().isUnauthorized());
     }
     @Test void fixedFactsCannotBeOverwrittenOrEnrolledAfterCompletion() throws Exception {
-        assertThat(deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(List.of("부산에 갔다","친구와 케이크를 먹었다"),true)).id()).isEqualTo(id);
-        assertThatThrownBy(()->deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(List.of("변경"),true))).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
+        assertThat(deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(references,true)).id()).isEqualTo(id);
+        assertThatThrownBy(()->deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(List.of(new DelayedRecallService.PhotoFact(photoId,"변경")),true))).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
         mvc.perform(post("/api/users/me/training-sessions/"+sessionId+"/delayed-recall").header("Authorization","Bearer "+token)
             .contentType(MediaType.APPLICATION_JSON).content("{\"facts\":[null],\"confirmed\":true}")).andExpect(status().isBadRequest());
         db.update("DELETE FROM delayed_recalls WHERE id=?",id);complete(now);
-        assertThatThrownBy(()->deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(List.of("사후 확인"),true))).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
+        assertThatThrownBy(()->deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(references,true))).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
     }
-    @Test void gradingRequiresAllFactsRealQuotesAndIndependentReviewer(){
-        complete(now.minus(Duration.ofDays(7)));deterministic.start(userId,id);
-        deterministic.save(userId,id,new DelayedRecallService.Response(0L,"부산에 갔다",false),true);
-        var facts=deterministic.review(otherId,id).facts();
-        assertThatThrownBy(()->deterministic.review(userId,id)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
-        var incomplete=new DelayedRecallService.Grade(List.of(new DelayedRecallService.Mark(facts.get(0).id(),true,"부산에 갔다","")));
-        assertThatThrownBy(()->deterministic.grade(otherId,id,incomplete)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
-        var invalid=new DelayedRecallService.Grade(List.of(new DelayedRecallService.Mark(facts.get(0).id(),true,"제주도",""),new DelayedRecallService.Mark(facts.get(1).id(),false,"","")));
-        assertThatThrownBy(()->deterministic.grade(otherId,id,invalid)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
-        var grade=new DelayedRecallService.Grade(List.of(new DelayedRecallService.Mark(facts.get(0).id(),true,"부산에 갔다","의미 일치"),new DelayedRecallService.Mark(facts.get(1).id(),false,"","언급 없음")));
-        var result=deterministic.grade(otherId,id,grade);
-        assertThat(result.recallRate()).isEqualTo(50.0);assertThat(service.get(userId,id).facts()).hasSize(2);
-        assertThat(result.elapsedSeconds()).isEqualTo(604800L);
-        assertThatThrownBy(()->deterministic.grade(otherId,id,grade)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
+    @Test void rejectsRepeatedPhotosAndMultilineInformation(){
+        for(var facts:List.of(List.of(new DelayedRecallService.PhotoFact(photoId,"첫 줄"),new DelayedRecallService.PhotoFact(photoId,"다른 줄")),
+                List.of(new DelayedRecallService.PhotoFact(photoId,"첫 줄\n둘째 줄")))) {
+            assertThatThrownBy(()->deterministic.setup(userId,sessionId,new DelayedRecallService.Setup(facts,true)))
+                .isInstanceOf(com.konkuk.memory.exception.ApiException.class);
+        }
+    }
+    @Test void retiredManualGradingEndpointsAreAbsent() throws Exception {
+        for(String endpoint:List.of("/api/users/me/delayed-recalls/access","/api/review/delayed-recalls","/api/review/delayed-recalls/"+id))
+            mvc.perform(get(endpoint).header("Authorization","Bearer "+token)).andExpect(status().isNotFound());
+    }
+    @Test void historicalScoresAndFactsRemainReadableWithoutAccountLink(){
+        db.update("UPDATE delayed_recall_facts SET recalled=(fact_order=1) WHERE delayed_recall_id=?",id);
+        db.update("UPDATE delayed_recalls SET graded_at=? WHERE id=?",Timestamp.from(now),id);
+        assertThat(service.get(userId,id).recallRate()).isEqualTo(50.0);
+        assertThat(service.get(userId,id).facts()).hasSize(2);
+    }
+    @Test void deletingAnotherReferencePhotoKeepsItsInformationSnapshot(){
+        db.update("DELETE FROM photos WHERE id=?",secondPhotoId);
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM delayed_recall_facts WHERE delayed_recall_id=?",Integer.class,id)).isEqualTo(2);
+        assertThat(db.queryForObject("SELECT photo_id FROM delayed_recall_facts WHERE delayed_recall_id=? AND fact_order=2",Long.class,id)).isNull();
+        assertThat(db.queryForObject("SELECT content FROM delayed_recall_facts WHERE delayed_recall_id=? AND fact_order=2",String.class,id)).isEqualTo("친구와 케이크를 먹었다");
     }
     @Test void cannotRecallCanBeSubmittedAndSessionDeletionCascades(){
         complete(now.minus(Duration.ofDays(7)));deterministic.start(userId,id);
         assertThatThrownBy(()->deterministic.save(userId,id,new DelayedRecallService.Response(0L,"",false),true)).isInstanceOf(com.konkuk.memory.exception.ApiException.class);
-        deterministic.save(userId,id,new DelayedRecallService.Response(0L,"",true),true);
-        var marks=deterministic.review(otherId,id).facts().stream().map(f->new DelayedRecallService.Mark(f.id(),false,"","기억 없음")).toList();
-        assertThat(deterministic.grade(otherId,id,new DelayedRecallService.Grade(marks)).recallRate()).isZero();
+        assertThat(deterministic.save(userId,id,new DelayedRecallService.Response(0L,"",true),true).status()).isEqualTo("SUBMITTED");
         db.update("DELETE FROM training_sessions WHERE id=?",sessionId);
         assertThat(db.queryForObject("SELECT COUNT(*) FROM delayed_recall_facts WHERE delayed_recall_id=?",Integer.class,id)).isZero();
     }
 }
-

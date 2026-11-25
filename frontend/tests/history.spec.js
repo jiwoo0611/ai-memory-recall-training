@@ -49,7 +49,6 @@ test.beforeEach(async ({ page }) => {
     }
     const responses = {
       "/api/users/me/delayed-recalls": [],
-      "/api/users/me/delayed-recalls/access": { canReview: false },
       "/api/users/me/training-sessions/7/delayed-recall": null,
       "/api/users/me": { id: 1, name: "테스트", email: "test@example.com" },
       "/api/users/me/photos": { content: [photo] },
@@ -410,5 +409,3 @@ test("mypage retains saved growth, activity and training detail data", async ({ 
   await expect(page.getByLabel("훈련 상세")).toContainText("저장된 훈련 요약");
   await expect(page.getByRole("link", { name: "저장된 결과 보기" })).toHaveAttribute("href", "#/training/7");
 });
-
-
