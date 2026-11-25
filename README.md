@@ -2,8 +2,6 @@
   
 # AI-Based Memory Recall Training System
 
-## 기억산책
-
 ### 사진 속 순간을, 나의 이야기로
 
 개인 사진으로 질문을 만들고, 답변과 훈련 기록을 차곡차곡 쌓아가는 기억 회상 서비스
