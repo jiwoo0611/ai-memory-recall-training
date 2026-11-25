@@ -1447,3 +1447,6 @@ dd {
 .delayed-photo-fact .photo-image { width: 100%; height: auto; max-height: 320px; object-fit: contain; border-radius: 12px; background: #f6f8f5; }
 .delayed-photo-fact input { width: 100%; box-sizing: border-box; }
 .delayed-enrollment-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+
+/* Keep the optional evaluation choice separate from the quiz start action. */
+.delayed-enrollment > button { margin: 8px 12px 8px 0; }
