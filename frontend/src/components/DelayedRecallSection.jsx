@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import { date, ErrorBox } from './UI';
 import PhotoImage from './PhotoImage';
 
-export const recallLabels = { WAITING_TRAINING: '훈련 완료 후 예약', NOT_DUE: '평가 대기', AVAILABLE: '평가 가능', IN_PROGRESS: '작성 중', SUBMITTED: '제출 완료', GRADED: '평가 완료' };
+export const recallLabels = { WAITING_TRAINING: '훈련 완료 후 예약', NOT_DUE: '평가 대기', AVAILABLE: '평가 가능', IN_PROGRESS: '작성 중', SUBMITTED: 'AI 채점 대기', GRADED: 'AI 채점 완료' };
 export function RecallLink({ item }) {
   const waiting = ['WAITING_TRAINING', 'NOT_DUE'].includes(item.status);
   const days = item.availableAt ? Math.max(0, Math.ceil((new Date(item.availableAt) - Date.now()) / 86400000)) : null;
@@ -14,7 +14,7 @@ export function RecallLink({ item }) {
       {item.status === 'GRADED' && <p>7일 지연 회상률 <strong>{item.recallRate}%</strong></p>}
     </div>
     {waiting ? <button disabled>{days !== null ? `평가까지 ${days}일 남았어요` : '훈련 완료 후 예약'}</button>
-      : <a className="button" href={`#/delayed-recall/${item.id}`}>{item.status === 'AVAILABLE' ? '회상 평가 시작' : item.status === 'IN_PROGRESS' ? '이어서 작성' : '결과 보기'}</a>}
+      : <a className="button" href={`#/delayed-recall/${item.id}`}>{item.status === 'AVAILABLE' ? '회상 평가 시작' : item.status === 'IN_PROGRESS' ? '이어서 작성' : item.status == 'SUBMITTED' ? '채점 확인' : '결과 보기'}</a>}
   </article>;
 }
 export default function DelayedRecallSection({ albumId }) {

@@ -311,6 +311,7 @@ export const api = {
   startDelayed: (id) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/start`, { method: 'POST' }),
   saveDelayed: (id, body) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/draft`, { method: 'PATCH', body }),
   submitDelayed: (id, body) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/submit`, { method: 'POST', body }),
+  gradeDelayed: (id) => request(`/api/users/me/delayed-recalls/${encodeURIComponent(id)}/grade`, { method: 'POST' }),
   submitRecall: (id, answers) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/answers`, { method: "POST", body: { answers } }),
   feedback: (id) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/feedback`, { method: "POST" }),
   retrain: (id, requestId) => request(`/api/users/me/training-sessions/${encodeURIComponent(id)}/retrain`, { method: "POST", body: { requestId } }),

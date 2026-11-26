@@ -1,5 +1,10 @@
 package com.konkuk.memory.service;
 
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
+
+import org.springframework.test.context.TestExecutionListeners;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.konkuk.memory.entity.*;
 import com.konkuk.memory.repository.*;
@@ -36,15 +41,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     org.springframework.test.context.web.ServletTestExecutionListener.class,
     org.springframework.test.context.support.DependencyInjectionTestExecutionListener.class,
     org.springframework.test.context.transaction.TransactionalTestExecutionListener.class
-},mergeMode=org.springframework.test.context.TestExecutionListeners.MergeMode.REPLACE_DEFAULTS)
+},mergeMode= TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 class DelayedRecallIntegrationTest {
     @Configuration
     @EnableAutoConfiguration
     @EntityScan("com.konkuk.memory.entity")
     @EnableJpaRepositories("com.konkuk.memory.repository")
-    @Import({DelayedRecallService.class, DelayedRecallController.class, SecurityConfig.class,
-        SecurityErrorHandler.class, RevokedTokenStore.class, RevokedTokenRepository.class, TokenService.class, GlobalExceptionHandler.class})
+    @Import({DelayedRecallService.class, DelayedRecallGradingService.class,
+            DelayedRecallController.class, SecurityConfig.class,
+            SecurityErrorHandler.class, RevokedTokenStore.class,
+            RevokedTokenRepository.class, TokenService.class,
+            GlobalExceptionHandler.class})
     static class TestApp {}
+    @MockitoBean GeminiRecallGradingClient gradingClient;
+    @Autowired DelayedRecallGradingService gradingService;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate db;
@@ -161,5 +171,213 @@ class DelayedRecallIntegrationTest {
         assertThat(deterministic.save(userId,id,new DelayedRecallService.Response(0L,"",true),true).status()).isEqualTo("SUBMITTED");
         db.update("DELETE FROM training_sessions WHERE id=?",sessionId);
         assertThat(db.queryForObject("SELECT COUNT(*) FROM delayed_recall_facts WHERE delayed_recall_id=?",Integer.class,id)).isZero();
+    }
+
+    // AI 채점 테스트용 평가 제출
+    private void submitForGrading(String text, boolean cannotRecall) {
+        complete(now.minus(Duration.ofDays(7)));
+        deterministic.start(userId, id);
+
+        deterministic.save(
+                userId,
+                id,
+                new DelayedRecallService.Response(
+                        0L, text, cannotRecall
+                ),
+                true
+        );
+    }
+
+    // 채점 대상 사실 ID 조회
+    private List<Long> gradingFactIds() {
+        return db.queryForList(
+                "SELECT id FROM delayed_recall_facts " +
+                        "WHERE delayed_recall_id=? ORDER BY fact_order",
+                Long.class,
+                id
+        );
+    }
+
+    // 테스트 1. 모든 정보를 기억한 경우
+    @Test
+    void aiGradingReturnsFullScore() {
+        submitForGrading(
+                "부산에 갔고 친구와 케이크를 먹었다",
+                false
+        );
+
+        var ids = gradingFactIds();
+
+        when(gradingClient.grade(anyList(), anyString()))
+                .thenReturn(List.of(
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(0), true,
+                                "부산에 갔고",
+                                "장소를 정확하게 기억함"
+                        ),
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(1), true,
+                                "친구와 케이크를 먹었다",
+                                "경험을 정확하게 기억함"
+                        )
+                ));
+
+        var result = gradingService.grade(userId, id);
+
+        assertThat(result.status()).isEqualTo("GRADED");
+        assertThat(result.recallRate()).isEqualTo(100.0);
+        assertThat(result.recalledCount()).isEqualTo(2);
+        assertThat(result.facts()).hasSize(2);
+    }
+
+    // 테스트 2. 일부 정보만 기억한 경우
+    @Test
+    void aiGradingReturnsPartialScore() {
+        submitForGrading("부산에 갔다", false);
+
+        var ids = gradingFactIds();
+
+        when(gradingClient.grade(anyList(), anyString()))
+                .thenReturn(List.of(
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(0), true,
+                                "부산에 갔다",
+                                "장소를 정확하게 기억함"
+                        ),
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(1), false,
+                                "",
+                                "케이크를 먹은 경험이 없음"
+                        )
+                ));
+
+        var result = gradingService.grade(userId, id);
+
+        assertThat(result.status()).isEqualTo("GRADED");
+        assertThat(result.recallRate()).isEqualTo(50.0);
+        assertThat(result.recalledCount()).isEqualTo(1);
+    }
+
+    // 테스트 3. 잘못된 정보를 기억한 경우
+    @Test
+    void aiGradingReturnsZeroScore() {
+        submitForGrading("제주도에서 혼자 밥을 먹었다", false);
+
+        var ids = gradingFactIds();
+
+        when(gradingClient.grade(anyList(), anyString()))
+                .thenReturn(List.of(
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(0), false, "",
+                                "장소가 일치하지 않음"
+                        ),
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(1), false, "",
+                                "경험이 일치하지 않음"
+                        )
+                ));
+
+        var result = gradingService.grade(userId, id);
+
+        assertThat(result.status()).isEqualTo("GRADED");
+        assertThat(result.recallRate()).isEqualTo(0.0);
+        assertThat(result.recalledCount()).isZero();
+    }
+
+    // 테스트 4. 기억나지 않음을 선택한 경우
+    @Test
+    void cannotRecallSkipsGemini() {
+        submitForGrading("", true);
+
+        var result = gradingService.grade(userId, id);
+
+        assertThat(result.status()).isEqualTo("GRADED");
+        assertThat(result.recallRate()).isEqualTo(0.0);
+
+        verifyNoInteractions(gradingClient);
+    }
+
+    // 테스트 5. AI 오류 발생 후 재시도
+    @Test
+    void aiFailurePreservesResponseAndAllowsRetry() {
+        submitForGrading("부산에 갔다", false);
+
+        when(gradingClient.grade(anyList(), anyString()))
+                .thenThrow(new RuntimeException("AI 서버 오류"));
+
+        assertThatThrownBy(
+                () -> gradingService.grade(userId, id)
+        ).isInstanceOf(RuntimeException.class);
+
+        var saved = service.get(userId, id);
+
+        assertThat(saved.status()).isEqualTo("SUBMITTED");
+        assertThat(saved.responseText()).isEqualTo("부산에 갔다");
+
+        var ids = gradingFactIds();
+
+        doReturn(List.of(
+                new GeminiRecallGradingClient.FactGrade(
+                        ids.get(0), true,
+                        "부산에 갔다",
+                        "장소 일치"
+                ),
+                new GeminiRecallGradingClient.FactGrade(
+                        ids.get(1), false, "",
+                        "경험 누락"
+                )
+        )).when(gradingClient).grade(anyList(), anyString());
+
+        var result = gradingService.grade(userId, id);
+
+        assertThat(result.status()).isEqualTo("GRADED");
+        assertThat(result.recallRate()).isEqualTo(50.0);
+    }
+
+    // 테스트 6. 중복 채점 방지
+    @Test
+    void repeatedGradingDoesNotCallGeminiAgain() {
+        submitForGrading("부산에 갔다", false);
+
+        var ids = gradingFactIds();
+
+        when(gradingClient.grade(anyList(), anyString()))
+                .thenReturn(List.of(
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(0), true,
+                                "부산에 갔다",
+                                "장소 일치"
+                        ),
+                        new GeminiRecallGradingClient.FactGrade(
+                                ids.get(1), false, "",
+                                "경험 누락"
+                        )
+                ));
+
+        var first = gradingService.grade(userId, id);
+        var second = gradingService.grade(userId, id);
+
+        assertThat(second.recallRate())
+                .isEqualTo(first.recallRate());
+
+        assertThat(second.gradedAt())
+                .isEqualTo(first.gradedAt());
+
+        verify(gradingClient, times(1))
+                .grade(anyList(), anyString());
+    }
+
+    // 테스트 7. 다른 사용자의 채점 요청 차단
+    @Test
+    void foreignUserCannotRequestGrading() {
+        submitForGrading("부산에 갔다", false);
+
+        assertThatThrownBy(
+                () -> gradingService.grade(otherId, id)
+        ).isInstanceOf(
+                com.konkuk.memory.exception.ApiException.class
+        );
+
+        verifyNoInteractions(gradingClient);
     }
 }
